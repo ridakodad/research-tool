@@ -95,8 +95,11 @@ const DEFAULT_FIELDS: FieldInput[] = [
           kind: 'keyword',
           any: ['diabete', 'diabétique', 'diabetique'],
           // Évite le faux positif sur « pas de diabète », très fréquent.
-          none: ['pas de', 'absence de', 'sans', 'non ', 'aucun'],
+          none: ['pas de', 'absence de', 'sans', 'aucun'],
           emit: true,
+          // « Pas de diabète » documente une absence : c'est un « Non », pas
+          // une donnée manquante.
+          emitIfNegated: false,
         },
       ],
     },
@@ -114,8 +117,9 @@ const DEFAULT_FIELDS: FieldInput[] = [
         {
           kind: 'keyword',
           any: ['hta', 'hypertension arterielle', 'hypertendu', 'hypertendue'],
-          none: ['pas de', 'absence de', 'sans', 'non ', 'aucun'],
+          none: ['pas de', 'absence de', 'sans', 'aucun'],
           emit: true,
+          emitIfNegated: false,
         },
       ],
     },
@@ -132,8 +136,9 @@ const DEFAULT_FIELDS: FieldInput[] = [
         {
           kind: 'keyword',
           any: ['tabagique', 'tabagisme', 'fumeur', 'fumeuse'],
-          none: ['pas de', 'absence de', 'sans', 'non ', 'jamais', 'sevre'],
+          none: ['pas de', 'absence de', 'sans', 'jamais', 'sevre'],
           emit: true,
+          emitIfNegated: false,
         },
       ],
     },
@@ -190,8 +195,9 @@ const DEFAULT_FIELDS: FieldInput[] = [
         {
           kind: 'keyword',
           any: ['fievre', 'febrile', 'fébrile'],
-          none: ['pas de', 'absence de', 'sans', 'apyre', 'non '],
+          none: ['pas de', 'absence de', 'sans', 'apyre'],
           emit: true,
+          emitIfNegated: false,
         },
       ],
     },
@@ -358,8 +364,9 @@ const DEFAULT_FIELDS: FieldInput[] = [
         {
           kind: 'keyword',
           any: ['complication'],
-          none: ['pas de', 'absence de', 'sans', 'aucune', 'non '],
+          none: ['pas de', 'absence de', 'sans', 'aucune'],
           emit: true,
+          emitIfNegated: false,
         },
       ],
     },

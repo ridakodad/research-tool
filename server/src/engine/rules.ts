@@ -37,6 +37,28 @@ const DEFAULT_CONFIDENCE: Record<ExtractionRule['kind'], number> = {
   keyword: 0.7,
 };
 
+/**
+ * Correspondance trouvée par une règle.
+ *
+ * `start` et `end` désignent des positions dans le texte *replié* ; `haystack`
+ * est le texte qui a été parcouru — pas nécessairement celui du document,
+ * puisqu'une règle peut viser le nom de fichier ou les tags DICOM. Conserver
+ * les deux permet de restituer la valeur et l'extrait avec leur casse et leurs
+ * accents d'origine.
+ */
+interface RuleMatch {
+  raw: FieldValue;
+  start: number;
+  end: number;
+  haystack: FoldedText | null;
+}
+
+/** Restitue le fragment d'origine correspondant à un intervalle replié. */
+function originalSlice(ft: FoldedText, start: number, end: number): string {
+  const range = toOriginalRange(ft, start, end);
+  return ft.original.slice(range.start, range.end).trim();
+}
+
 /** Retire les diacritiques sans toucher à la casse (préserve `\D`, `\S`… dans les motifs). */
 function stripDiacritics(s: string): string {
   return s.normalize('NFD').replace(/\p{M}/gu, '');
@@ -77,15 +99,15 @@ function describeRule(rule: ExtractionRule): string {
 function makeEvidence(
   doc: SourceDoc,
   rule: ExtractionRule,
+  ft: FoldedText,
   foldedStart: number,
   foldedEnd: number,
 ): Evidence {
-  const ft = foldedOf(doc);
   const { start, end } = toOriginalRange(ft, foldedStart, foldedEnd);
   return {
     documentId: doc.id,
     documentName: doc.name,
-    snippet: makeSnippet(doc.text, start, end),
+    snippet: makeSnippet(ft.original, start, end),
     start,
     end,
     rule: describeRule(rule),
@@ -130,7 +152,7 @@ function buildLabelPattern(label: string): string {
   );
 }
 
-function applyLabelRule(rule: LabelRule, doc: SourceDoc): { raw: string; start: number; end: number } | null {
+function applyLabelRule(rule: LabelRule, doc: SourceDoc): RuleMatch | null {
   const ft = haystack(doc, rule.source);
   if (!ft) return null;
   const max = Math.min(Math.max(rule.maxLength ?? 120, 1), 500);
@@ -145,18 +167,19 @@ function applyLabelRule(rule: LabelRule, doc: SourceDoc): { raw: string; start: 
       let m: RegExpExecArray | null;
       while ((m = re.exec(ft.folded)) !== null) {
         const captured = m[1];
-        if (captured === undefined) continue;
-        const raw = captured.trim();
-        if (raw.length === 0) continue;
+        if (captured === undefined || captured.trim().length === 0) continue;
         const start = m.index + m[0].length - captured.length;
-        return { raw, start, end: start + captured.length };
+        const end = start + captured.length;
+        const raw = originalSlice(ft, start, end);
+        if (raw.length === 0) continue;
+        return { raw, start, end, haystack: ft };
       }
     }
   }
   return null;
 }
 
-function applyRegexRule(rule: RegexRule, doc: SourceDoc): { raw: string; start: number; end: number } | null {
+function applyRegexRule(rule: RegexRule, doc: SourceDoc): RuleMatch | null {
   const ft = haystack(doc, rule.source);
   if (!ft) return null;
   const re = compile(stripDiacritics(rule.pattern), (rule.flags ?? '') + 'g');
@@ -171,16 +194,69 @@ function applyRegexRule(rule: RegexRule, doc: SourceDoc): { raw: string; start: 
     if (captured === undefined || captured.trim().length === 0) continue;
     const offsetInMatch = m[0].indexOf(captured);
     const start = m.index + (offsetInMatch >= 0 ? offsetInMatch : 0);
-    return { raw: captured.trim(), start, end: start + captured.length };
+    const end = start + captured.length;
+    const raw = originalSlice(ft, start, end);
+    if (raw.length === 0) continue;
+    return { raw, start, end, haystack: ft };
   }
   return null;
 }
 
-function applyKeywordRule(rule: KeywordRule, doc: SourceDoc): { raw: FieldValue; start: number; end: number } | null {
+/** Élisions françaises courantes, ramenées à leur forme pleine. */
+const ELISIONS: Record<string, string> = {
+  d: 'de', l: 'le', n: 'ne', s: 'se', c: 'ce', j: 'je', m: 'me', t: 'te', qu: 'que',
+};
+
+/**
+ * Normalise un fragment pour la détection de négation.
+ *
+ * « pas de », « pas d'HTA » et « pas d’HTA » expriment la même chose ; sans
+ * cette normalisation, l'utilisateur devrait saisir chaque variante
+ * d'apostrophe et d'élision comme terme d'exclusion distinct.
+ *
+ * Utilisée uniquement pour un test de présence : elle modifie les longueurs
+ * et ne doit donc jamais servir à calculer une position.
+ */
+function normalizeElision(fragment: string): string {
+  return fragment
+    .replace(/['‘’ʼ´`]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b(qu|[dlnscjmt])\b/g, (_, group: string) => ELISIONS[group] ?? group);
+}
+
+/** Ponctuation qui clôt une proposition dans un compte rendu. */
+const CLAUSE_BOUNDARY = /[,;.!?\n\r•|]/;
+
+/**
+ * Restreint le contexte de négation à la proposition qui contient le terme.
+ *
+ * Dans « pas de diabète, HTA sous traitement », le « pas de » porte sur le
+ * diabète seul : une simple fenêtre de caractères le rattacherait à tort à
+ * l'HTA et inverserait la variable. On ne remonte donc que jusqu'à la
+ * ponctuation précédente.
+ *
+ * Exception : une proposition introduite par « ni » prolonge la négation
+ * précédente — « pas de diabète, ni d'HTA » nie bien les deux.
+ */
+function negationContext(window: string): string {
+  const parts = window.split(CLAUSE_BOUNDARY);
+  let index = parts.length - 1;
+  let context = parts[index] ?? '';
+  while (index > 0 && /^\s*ni\b/.test(parts[index] ?? '')) {
+    index--;
+    context = `${parts[index] ?? ''} ${context}`;
+  }
+  return context;
+}
+
+function applyKeywordRule(rule: KeywordRule, doc: SourceDoc): RuleMatch | null {
   const ft = haystack(doc, rule.source);
   if (!ft) return null;
   const window = rule.noneWindow ?? 40;
-  const negations = (rule.none ?? []).map(fold).filter(Boolean);
+  const negations = (rule.none ?? []).map((n) => normalizeElision(fold(n))).filter(Boolean);
+
+  /** Première occurrence niée, retenue au cas où aucune occurrence affirmée n'existe. */
+  let negatedHit: { start: number; end: number } | null = null;
 
   for (const term of rule.any) {
     const needle = fold(term).trim();
@@ -190,18 +266,27 @@ function applyKeywordRule(rule: KeywordRule, doc: SourceDoc): { raw: FieldValue;
       const idx = ft.folded.indexOf(needle, from);
       if (idx === -1) break;
       // Contexte précédant l'occurrence, pour détecter « pas de », « absence de »…
-      const before = ft.folded.slice(Math.max(0, idx - window), idx);
+      const before = normalizeElision(
+        negationContext(ft.folded.slice(Math.max(0, idx - window), idx)),
+      );
       const negated = negations.some((n) => before.includes(n));
       if (!negated) {
-        return { raw: rule.emit, start: idx, end: idx + needle.length };
+        return { raw: rule.emit, start: idx, end: idx + needle.length, haystack: ft };
       }
+      negatedHit ??= { start: idx, end: idx + needle.length };
       from = idx + needle.length;
     }
+  }
+
+  // Aucune mention affirmée dans ce document : l'absence documentée est une
+  // information à part entière si la règle prévoit une valeur pour ce cas.
+  if (negatedHit && rule.emitIfNegated !== undefined) {
+    return { raw: rule.emitIfNegated, start: negatedHit.start, end: negatedHit.end, haystack: ft };
   }
   return null;
 }
 
-function applyDicomRule(rule: DicomRule, doc: SourceDoc): { raw: string; start: number; end: number } | null {
+function applyDicomRule(rule: DicomRule, doc: SourceDoc): RuleMatch | null {
   const wanted = rule.tag.trim();
   const direct = doc.dicomTags[wanted];
   const value =
@@ -211,7 +296,7 @@ function applyDicomRule(rule: DicomRule, doc: SourceDoc): { raw: string; start: 
       ([k]) => fold(k) === fold(wanted) || fold(k) === fold(wanted.replace(/[(),x]/gi, '')),
     )?.[1];
   if (value === undefined || String(value).trim().length === 0) return null;
-  return { raw: String(value).trim(), start: 0, end: 0 };
+  return { raw: String(value).trim(), start: 0, end: 0, haystack: null };
 }
 
 /** Le document est-il éligible à cette règle (filtre par nature de document) ? */
@@ -236,7 +321,7 @@ export function extractField(field: TemplateField, docs: SourceDoc[]): RuleHit |
     for (const doc of docs) {
       if (!docAllowed(rule, doc)) continue;
 
-      let match: { raw: FieldValue; start: number; end: number } | null = null;
+      let match: RuleMatch | null = null;
       switch (rule.kind) {
         case 'label':
           match = applyLabelRule(rule, doc);
@@ -264,17 +349,16 @@ export function extractField(field: TemplateField, docs: SourceDoc[]): RuleHit |
       return {
         value: typed.value,
         confidence: Number(confidence.toFixed(2)),
-        evidence:
-          rule.kind === 'dicom'
-            ? {
-                documentId: doc.id,
-                documentName: doc.name,
-                snippet: `${rule.tag} = ${String(match.raw)}`,
-                start: 0,
-                end: 0,
-                rule: describeRule(rule),
-              }
-            : makeEvidence(doc, rule, match.start, match.end),
+        evidence: match.haystack
+          ? makeEvidence(doc, rule, match.haystack, match.start, match.end)
+          : {
+              documentId: doc.id,
+              documentName: doc.name,
+              snippet: `${rule.kind === 'dicom' ? rule.tag : field.key} = ${String(match.raw)}`,
+              start: 0,
+              end: 0,
+              rule: describeRule(rule),
+            },
       };
     }
   }

@@ -162,6 +162,32 @@ describe('règle « libellé : valeur »', () => {
     assert.equal(hit?.value, 61);
   });
 
+  test('restitue la valeur avec sa casse et ses accents d’origine', () => {
+    // La recherche est insensible à la casse et aux accents, mais la valeur
+    // enregistrée doit être celle du document — sans quoi le jeu de données
+    // exporté serait dégradé.
+    const hit = extractField(
+      field({
+        type: 'text',
+        extraction: { enabled: true, rules: [{ kind: 'label', labels: ['Antécédents'] }] },
+      }),
+      [doc("Antécédents : Diabète type 2, pas d'HTA, IDM en 2019")],
+    );
+    assert.equal(hit?.value, "Diabète type 2, pas d'HTA, IDM en 2019");
+  });
+
+  test('l’extrait justificatif conserve le texte d’origine', () => {
+    const hit = extractField(
+      field({
+        type: 'text',
+        extraction: { enabled: true, rules: [{ kind: 'label', labels: ['Motif'] }] },
+      }),
+      [doc('Motif : Œdème aigu du poumon')],
+    );
+    assert.equal(hit?.value, 'Œdème aigu du poumon');
+    assert.match(hit!.evidence.snippet, /Œdème aigu du poumon/);
+  });
+
   test('cite le document et l’extrait justificatif', () => {
     const hit = extractField(
       field({
@@ -256,6 +282,119 @@ describe('règle mot-clé', () => {
       }),
       [doc('Pas de diabète dans la famille. Le patient est diabétique depuis 2015.')],
     );
+    assert.equal(hit?.value, true);
+  });
+
+  test('la négation est reconnue malgré l’élision et l’apostrophe', () => {
+    // « pas d'HTA », « pas d’HTA » et « pas de HTA » expriment la même chose ;
+    // le terme d'exclusion « pas de » doit couvrir les trois.
+    const f = field({
+      type: 'boolean',
+      extraction: {
+        enabled: true,
+        rules: [{ kind: 'keyword', any: ['hta'], none: ['pas de'], emit: true }],
+      },
+    });
+    for (const variant of ["Antécédents : pas d'HTA.", 'Antécédents : pas d’HTA.', 'Pas de HTA.']) {
+      assert.equal(extractField(f, [doc(variant)]), null, `négation manquée sur « ${variant} »`);
+    }
+    // Une mention affirmée reste bien détectée.
+    assert.equal(extractField(f, [doc('Patient suivi pour HTA.')])?.value, true);
+  });
+
+  test('une absence documentée peut valoir « Non » plutôt que vide', () => {
+    const f = field({
+      type: 'boolean',
+      extraction: {
+        enabled: true,
+        rules: [
+          {
+            kind: 'keyword',
+            any: ['diabete', 'diabétique'],
+            none: ['pas de', 'absence de'],
+            emit: true,
+            emitIfNegated: false,
+          },
+        ],
+      },
+    });
+    const negated = extractField(f, [doc('Antécédents : pas de diabète.')]);
+    assert.equal(negated?.value, false, 'l’absence documentée doit être enregistrée');
+    // La justification doit pointer sur la mention niée.
+    assert.match(negated!.evidence.snippet, /pas de diabète/i);
+
+    assert.equal(extractField(f, [doc('Patient diabétique.')])?.value, true);
+    // Sans mention du tout, la variable reste vide : donnée manquante.
+    assert.equal(extractField(f, [doc('Rien à signaler.')]), null);
+  });
+
+  test('la négation ne déborde pas sur l’élément suivant de la liste', () => {
+    // Cas très fréquent : une liste d'antécédents où seul le premier est nié.
+    // Sans limitation à la proposition, « pas de » contaminerait « HTA ».
+    const text = 'Antécédents : pas de diabète, HTA sous traitement, pas de tabagisme.';
+    const rule = (terms: string[]) =>
+      field({
+        type: 'boolean',
+        extraction: {
+          enabled: true,
+          rules: [
+            {
+              kind: 'keyword',
+              any: terms,
+              none: ['pas de', 'absence de'],
+              emit: true,
+              emitIfNegated: false,
+            },
+          ],
+        },
+      });
+
+    assert.equal(extractField(rule(['diabete', 'diabétique']), [doc(text)])?.value, false);
+    assert.equal(extractField(rule(['hta']), [doc(text)])?.value, true);
+    assert.equal(extractField(rule(['tabagisme', 'tabagique']), [doc(text)])?.value, false);
+  });
+
+  test('« ni » prolonge la négation à l’élément suivant', () => {
+    const hit = extractField(
+      field({
+        type: 'boolean',
+        extraction: {
+          enabled: true,
+          rules: [
+            {
+              kind: 'keyword',
+              any: ['hta'],
+              none: ['pas de'],
+              emit: true,
+              emitIfNegated: false,
+            },
+          ],
+        },
+      }),
+      [doc("Antécédents : pas de diabète, ni d'HTA.")],
+    );
+    assert.equal(hit?.value, false);
+  });
+
+  test('une mention affirmée l’emporte sur une mention niée ailleurs', () => {
+    const f = field({
+      type: 'boolean',
+      extraction: {
+        enabled: true,
+        rules: [
+          {
+            kind: 'keyword',
+            any: ['diabete', 'diabétique'],
+            none: ['pas de'],
+            emit: true,
+            emitIfNegated: false,
+          },
+        ],
+      },
+    });
+    const hit = extractField(f, [
+      doc('Pas de diabète dans la famille. Le patient est diabétique depuis 2015.'),
+    ]);
     assert.equal(hit?.value, true);
   });
 

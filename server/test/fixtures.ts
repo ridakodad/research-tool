@@ -20,7 +20,10 @@ export function makePdf(lines: string[]): Buffer {
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R ' +
       '/Resources << /Font << /F1 5 0 R >> >> >>',
     `<< /Length ${body.length} >>\nstream\n${body}\nendstream`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    // Sans encodage déclaré, les octets > 127 sont lus selon l'encodage
+    // standard PDF et « é » ressort en « Ø ». WinAnsi correspond au latin1
+    // utilisé pour sérialiser le flux.
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
   ];
 
   let pdf = '%PDF-1.4\n';

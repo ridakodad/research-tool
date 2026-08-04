@@ -54,6 +54,7 @@ const keywordRule = z.object({
   none: z.array(z.string().trim().min(1)).optional(),
   noneWindow: z.number().int().min(0).max(500).optional(),
   emit: fieldValue,
+  emitIfNegated: fieldValue.optional(),
   source: ruleSource.optional(),
   docKinds: z.array(docKind).optional(),
   confidence,

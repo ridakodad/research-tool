@@ -77,6 +77,15 @@ export interface KeywordRule {
   noneWindow?: number;
   /** Valeur émise en cas de correspondance. */
   emit: FieldValue;
+  /**
+   * Valeur émise lorsque le terme n'apparaît que sous une forme niée.
+   *
+   * « Pas de diabète » est une information clinique — l'absence a été
+   * recherchée et documentée — et non une donnée manquante. Sans cette
+   * option, la variable resterait vide et le manquant ne serait pas
+   * interprétable à l'analyse.
+   */
+  emitIfNegated?: FieldValue;
   source?: RuleSource;
   docKinds?: DocKind[];
   confidence?: number;

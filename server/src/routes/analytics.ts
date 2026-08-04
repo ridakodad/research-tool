@@ -80,6 +80,34 @@ function isEmpty(v: FieldValue): boolean {
   return v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
 }
 
+const MONTHS_FR = [
+  'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+  'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
+];
+
+/** `2024-03` -> `mars 2024`, en conservant un préfixe triable. */
+function formatMonth(yearMonth: string): string {
+  const [year, month] = yearMonth.split('-');
+  const index = Number(month) - 1;
+  const name = MONTHS_FR[index];
+  return name ? `${name} ${year}` : yearMonth;
+}
+
+const MONTH_INDEX = new Map(MONTHS_FR.map((name, i) => [name, i]));
+
+/** Trie des étiquettes « mars 2024 » ou « 2024 » dans l'ordre du temps. */
+function sortChronologically<T extends { label: string }>(items: T[]): T[] {
+  const key = (label: string): number => {
+    const parts = label.split(' ');
+    if (parts.length === 2) {
+      const month = MONTH_INDEX.get(parts[0]!) ?? 0;
+      return Number(parts[1]) * 12 + month;
+    }
+    return Number(parts[0]) * 12;
+  };
+  return [...items].sort((a, b) => key(a.label) - key(b.label));
+}
+
 /** Jeu de données brut, affiché tel quel dans le tableau des résultats. */
 analyticsRouter.get(
   '/dataset',
@@ -206,13 +234,24 @@ analyticsRouter.get(
         }
 
         case 'date': {
-          const years = present
-            .map((v) => String(v).slice(0, 4))
-            .filter((y) => /^\d{4}$/.test(y));
+          const dates = present
+            .map((v) => String(v))
+            .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+          // Un seul bâton « 2024 » n'apprend rien : on descend au mois tant que
+          // le nombre de classes reste lisible, et on remonte à l'année sinon.
+          const months = new Set(dates.map((d) => d.slice(0, 7)));
+          const buckets =
+            months.size <= 24
+              ? dates.map((d) => formatMonth(d.slice(0, 7)))
+              : dates.map((d) => d.slice(0, 4));
           return {
             ...base,
+            n: dates.length,
+            missing: rows.length - dates.length,
             chart: 'categories',
-            categories: countCategories(years).sort((a, b) => a.label.localeCompare(b.label)),
+            // Ordre chronologique : une distribution temporelle ne se trie pas
+            // par effectif.
+            categories: sortChronologically(countCategories(buckets)),
           };
         }
 
