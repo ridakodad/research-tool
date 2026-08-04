@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { IconAlert, IconAuto, IconClose, IconMoon, IconSun } from './icons';
 
 // ------------------------------------------------------------------- toasts
 
@@ -112,7 +113,7 @@ export function Modal({
           <h2>{title}</h2>
           <div className="spacer" />
           <button className="btn-icon" onClick={onClose} aria-label="Fermer">
-            ✕
+            <IconClose size={18} />
           </button>
         </div>
         <div className="modal-body">{children}</div>
@@ -146,7 +147,7 @@ export function LoadingPanel({ label = 'Chargement…' }: { label?: string }) {
 export function ErrorPanel({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="notice notice-error">
-      <span aria-hidden="true">⚠</span>
+      <IconAlert size={18} />
       <div style={{ flex: 1 }}>
         <div>{message}</div>
         {onRetry && (
@@ -294,7 +295,7 @@ export function ThemeToggle() {
   }, [theme]);
 
   const next = theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto';
-  const icon = theme === 'auto' ? '◐' : theme === 'light' ? '☀' : '☾';
+  const Icon = theme === 'auto' ? IconAuto : theme === 'light' ? IconSun : IconMoon;
   const labels = { auto: 'Thème système', light: 'Thème clair', dark: 'Thème sombre' };
 
   return (
@@ -304,7 +305,7 @@ export function ThemeToggle() {
       title={labels[theme]}
       aria-label={labels[theme]}
     >
-      <span aria-hidden="true">{icon}</span>
+      <Icon size={18} />
     </button>
   );
 }

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { formatBytes, plural } from '../lib/format';
 import { useToast } from './ui';
+import { IconAlert } from './icons';
 import type { UploadOutcome } from '../lib/types';
 
 interface PickedFile {
@@ -344,7 +345,7 @@ export function FolderUploader({
             </div>
             {results.some((r) => r.failures.length > 0) && (
               <div className="notice notice-warn">
-                <span aria-hidden="true">⚠</span>
+                <IconAlert size={18} />
                 <div>
                   <strong>Fichiers non analysés</strong>
                   <ul style={{ margin: '6px 0 0', paddingLeft: 18 }} className="small">

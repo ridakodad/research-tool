@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { formatDateTime, plural } from '../lib/format';
 import { FolderUploader } from '../components/FolderUploader';
@@ -12,6 +12,7 @@ import {
   Spinner,
   useToast,
 } from '../components/ui';
+import { IconAlert } from '../components/icons';
 import { StatTile } from '../components/charts/StatTile';
 import type {
   Capabilities,
@@ -23,6 +24,7 @@ import type {
 
 export function DossiersPage() {
   const toast = useToast();
+  const { hash } = useLocation();
   const [patients, setPatients] = useState<PatientSummary[] | null>(null);
   const [template, setTemplate] = useState<TemplateWithFields | null>(null);
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
@@ -53,6 +55,19 @@ export function DossiersPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Le rail d'outils pointe sur `#extraction`, mais la carte visée n'existe
+   * qu'une fois les dossiers chargés : le saut natif du navigateur arrive trop
+   * tôt. On rejoue donc le déplacement quand la cible apparaît.
+   */
+  useEffect(() => {
+    if (hash !== '#extraction' || patients === null) return;
+    const target = document.getElementById('extraction');
+    if (!target) return;
+    const motionOk = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: motionOk ? 'smooth' : 'auto', block: 'start' });
+  }, [hash, patients]);
 
   async function runExtraction() {
     if (!template) return;
@@ -119,7 +134,7 @@ export function DossiersPage() {
 
       {capabilities && !capabilities.ocr.available && (
         <div className="notice notice-warn">
-          <span aria-hidden="true">⚠</span>
+          <IconAlert size={18} />
           <div>
             <strong>Reconnaissance de texte indisponible.</strong> Les images et les documents
             scannés seront importés sans contenu textuel exploitable — leurs variables devront
@@ -155,7 +170,8 @@ export function DossiersPage() {
       )}
 
       {patients.length > 0 && (
-        <div className="card">
+        /* Cible du raccourci « Extraction » du rail d'outils. */
+        <div className="card" id="extraction">
           <div className="card-head">
             <h2>Extraction automatique</h2>
             <span className="sub">

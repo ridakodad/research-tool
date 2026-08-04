@@ -280,6 +280,49 @@ concerné. Convertir ces PDF en images avant import contourne la limite.
 
 ---
 
+## Identité visuelle
+
+L'interface est un **plan de travail** : le rail de gauche présente en
+permanence tous les outils, groupés par nature du travail — constituer le
+corpus, régler les instruments, lire les résultats, sortir les données.
+L'extraction n'est qu'un outil parmi eux.
+
+### Déposer le logo de l'établissement
+
+Le logo officiel n'est pas versionné dans le dépôt. Déposez-le ici :
+
+```
+web/public/logo-hopital.png
+```
+
+puis reconstruisez (`npm run build`). Il apparaît en haut à gauche, hauteur
+imposée à 34 px et largeur libre : le bloc-marque complet comme le symbole seul
+passent sans déformation. Formats acceptés : PNG ou SVG (adaptez alors
+l'extension dans `web/src/components/Brand.tsx`).
+
+Tant que le fichier est absent, un monogramme neutre aux couleurs de la charte
+prend sa place. Ce n'est volontairement pas une imitation du logo : une
+approximation donnerait à l'application un air d'officiel qu'elle n'a pas.
+
+### Couleurs
+
+La palette est dérivée du logo — vert forêt, rouge brique, vert tilleul de la
+sphère, encre presque noire — et déclarée en jetons dans
+`web/src/styles.css`. Chaque couleur portant du texte tient au minimum 4,5:1
+de contraste, dans les deux thèmes ; les valeurs mesurées sont notées en
+commentaire à côté de chaque jeton.
+
+Deux règles encadrent l'usage du rouge et du vert. Le rouge n'encode jamais de
+donnée : il ne sert qu'aux états critiques. Les graphiques n'ont qu'une série,
+portée par une seule teinte séquentielle verte. Un couple vert/rouge porteur de
+sens serait indistinguable sous déficience de vision des couleurs.
+
+Le thème clair ou sombre suit le système par défaut, et se force depuis la
+barre supérieure. Toute animation s'efface si le système demande la sobriété
+(`prefers-reduced-motion`).
+
+---
+
 ## Configuration
 
 | Variable | Défaut | Rôle |
@@ -334,6 +377,8 @@ server/          API Node/TypeScript, SQLite (module intégré `node:sqlite`)
   src/routes/    API HTTP
   test/          Tests unitaires et d'intégration
 web/             Interface React/TypeScript (Vite)
+  public/       Logo de l'établissement (déposé par vos soins)
+  src/          Coquille de l'espace de travail, outils, composants
 ```
 
 Le moteur d'extraction replie le texte (minuscules, sans diacritiques) tout en

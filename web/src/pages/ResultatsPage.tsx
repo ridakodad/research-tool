@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../lib/api';
 import { displayValue, formatNumber, plural } from '../lib/format';
 import { EmptyState, ErrorPanel, LoadingPanel } from '../components/ui';
@@ -15,7 +15,26 @@ import type {
   TemplateWithFields,
 } from '../lib/types';
 
-type Tab = 'table' | 'charts' | 'completeness';
+const TABS = [
+  ['table', 'Tableau de données'],
+  ['charts', 'Distributions'],
+  ['completeness', 'Complétude'],
+  ['export', 'Export'],
+] as const;
+
+type Tab = (typeof TABS)[number][0];
+
+/**
+ * La vue courante vit dans l'URL, pas dans un état interne : le rail d'outils
+ * peut ainsi pointer directement sur une vue, et un lien vers une distribution
+ * précise reste partageable entre deux personnes de l'équipe.
+ */
+function useTab(): [Tab, (tab: Tab) => void] {
+  const [params, setParams] = useSearchParams();
+  const requested = params.get('vue');
+  const tab = TABS.some(([key]) => key === requested) ? (requested as Tab) : 'table';
+  return [tab, (next) => setParams({ vue: next })];
+}
 
 export function ResultatsPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -27,7 +46,7 @@ export function ResultatsPage() {
   const [completeness, setCompleteness] = useState<CompletenessField[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>('table');
+  const [tab, setTab] = useTab();
 
   const load = useCallback(async (id?: number) => {
     setLoading(true);
@@ -133,20 +152,14 @@ export function ResultatsPage() {
             />
           </div>
 
-          <ExportPanel templateId={template.id} />
-
           <div className="card">
             <div className="card-head">
-              <div className="row" style={{ gap: 4 }}>
-                {(
-                  [
-                    ['table', 'Tableau brut'],
-                    ['charts', 'Graphiques'],
-                    ['completeness', 'Complétude'],
-                  ] as [Tab, string][]
-                ).map(([key, label]) => (
+              <div className="row" style={{ gap: 4 }} role="tablist" aria-label="Vue des résultats">
+                {TABS.map(([key, label]) => (
                   <button
                     key={key}
+                    role="tab"
+                    aria-selected={tab === key}
                     className={tab === key ? 'btn-primary btn-sm' : 'btn-sm'}
                     onClick={() => setTab(key)}
                   >
@@ -162,6 +175,7 @@ export function ResultatsPage() {
               {tab === 'completeness' && (
                 <CompletenessPanel fields={completeness} patientCount={rows.length} />
               )}
+              {tab === 'export' && <ExportPanel templateId={template.id} />}
             </div>
           </div>
         </>
@@ -220,19 +234,19 @@ function RawTable({ template, rows }: { template: TemplateWithFields; rows: Data
 
       <div className="row small secondary" style={{ gap: 16 }}>
         <span className="row" style={{ gap: 6 }}>
-          <span className="dot" style={{ background: 'var(--series-1)' }} />
+          <span className="dot" style={{ background: 'var(--source-rule)' }} />
           Règle d'extraction
         </span>
         <span className="row" style={{ gap: 6 }}>
-          <span className="dot" style={{ background: 'var(--series-2)' }} />
+          <span className="dot" style={{ background: 'var(--source-llm)' }} />
           Proposé par Claude
         </span>
         <span className="row" style={{ gap: 6 }}>
-          <span className="dot" style={{ background: 'var(--good)' }} />
+          <span className="dot" style={{ background: 'var(--source-manual)' }} />
           Vérifié ou saisi à la main
         </span>
         <span className="row" style={{ gap: 6 }}>
-          <span className="dot" style={{ background: 'var(--border-strong)' }} />
+          <span className="dot" style={{ background: 'var(--source-empty)' }} />
           Non renseigné
         </span>
       </div>
@@ -265,18 +279,25 @@ function RawTable({ template, rows }: { template: TemplateWithFields; rows: Data
                 {template.fields.map((field) => {
                   const value = row.values[field.key] ?? null;
                   const source = row.sources[field.key];
-                  const color =
+                  const origin =
                     source === 'manual'
-                      ? 'var(--good)'
+                      ? { color: 'var(--source-manual)', label: 'Vérifié ou saisi à la main' }
                       : source === 'llm'
-                        ? 'var(--series-2)'
+                        ? { color: 'var(--source-llm)', label: 'Proposé par Claude' }
                         : source === 'auto'
-                          ? 'var(--series-1)'
-                          : 'var(--border-strong)';
+                          ? { color: 'var(--source-rule)', label: "Règle d'extraction" }
+                          : { color: 'var(--source-empty)', label: 'Non renseigné' };
                   return (
                     <td key={field.id}>
                       <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-                        <span className="dot" style={{ background: color }} aria-hidden="true" />
+                        {/* La pastille double la légende ; son infobulle
+                            nomme l'origine, que la couleur seule ne suffit
+                            pas à porter. */}
+                        <span
+                          className="dot"
+                          style={{ background: origin.color }}
+                          title={origin.label}
+                        />
                         <span className={value === null ? 'muted' : undefined}>
                           {displayValue(value, field)}
                         </span>
@@ -437,67 +458,67 @@ function ExportPanel({ templateId }: { templateId: number }) {
   const [labels, setLabels] = useState(false);
 
   return (
-    <div className="card">
-      <div className="card-head">
-        <h2>Export</h2>
-        <span className="sub">Le fichier reflète exactement le tableau brut ci-dessous.</span>
-      </div>
-      <div className="card-body">
-        <div className="row" style={{ gap: 20, alignItems: 'flex-end' }}>
-          <div style={{ minWidth: 190 }}>
-            <label htmlFor="csv-delimiter">Séparateur</label>
-            <select
-              id="csv-delimiter"
-              value={delimiter}
-              onChange={(e) => setDelimiter(e.target.value)}
-            >
-              <option value=";">Point-virgule — Excel (français)</option>
-              <option value=",">Virgule — R, Python, SPSS</option>
-            </select>
-          </div>
+    <div className="stack" style={{ gap: 16 }}>
+      <p className="small secondary" style={{ maxWidth: '72ch' }}>
+        Le fichier reflète exactement le tableau de données, valeurs relues
+        comprises. Réglez la mise en forme selon le logiciel qui recevra le jeu
+        de données.
+      </p>
 
-          <div style={{ minWidth: 190 }}>
-            <label htmlFor="csv-booleans">Variables Oui/Non</label>
-            <select id="csv-booleans" value={booleans} onChange={(e) => setBooleans(e.target.value)}>
-              <option value="numeric">1 / 0 — analyse statistique</option>
-              <option value="text">Oui / Non — relecture</option>
-            </select>
-          </div>
-
-          <label className="checkbox" style={{ marginBottom: 8 }}>
-            <input
-              type="checkbox"
-              checked={labels}
-              onChange={(e) => setLabels(e.target.checked)}
-            />
-            <span>En-têtes en clair plutôt que les clés techniques</span>
-          </label>
-
-          <div className="spacer" />
-
-          <div className="row" style={{ gap: 8 }}>
-            <a
-              className="btn"
-              href={api.dictionaryUrl(templateId, delimiter)}
-              title="Description de chaque variable : type, unité, options, définition"
-            >
-              Dictionnaire des variables
-            </a>
-            <a
-              className="btn btn-primary"
-              href={api.csvUrl(templateId, { delimiter, booleans, labels })}
-            >
-              Télécharger le CSV
-            </a>
-          </div>
+      <div className="row" style={{ gap: 20, alignItems: 'flex-end' }}>
+        <div style={{ minWidth: 190 }}>
+          <label htmlFor="csv-delimiter">Séparateur</label>
+          <select
+            id="csv-delimiter"
+            value={delimiter}
+            onChange={(e) => setDelimiter(e.target.value)}
+          >
+            <option value=";">Point-virgule — Excel (français)</option>
+            <option value=",">Virgule — R, Python, SPSS</option>
+          </select>
         </div>
 
-        <p className="small muted" style={{ marginTop: 12 }}>
-          Le fichier est encodé en UTF-8 avec marque d'ordre des octets, pour qu'Excel affiche
-          correctement les accents. Les variables à choix multiple sont exportées dans une seule
-          colonne, options séparées par « | ».
-        </p>
+        <div style={{ minWidth: 190 }}>
+          <label htmlFor="csv-booleans">Variables Oui/Non</label>
+          <select id="csv-booleans" value={booleans} onChange={(e) => setBooleans(e.target.value)}>
+            <option value="numeric">1 / 0 — analyse statistique</option>
+            <option value="text">Oui / Non — relecture</option>
+          </select>
+        </div>
+
+        <label className="checkbox" style={{ marginBottom: 8 }}>
+          <input type="checkbox" checked={labels} onChange={(e) => setLabels(e.target.checked)} />
+          <span>En-têtes en clair plutôt que les clés techniques</span>
+        </label>
+
+        <div className="spacer" />
+
+        <div className="row" style={{ gap: 8 }}>
+          <a
+            className="btn"
+            href={api.dictionaryUrl(templateId, delimiter)}
+            title="Description de chaque variable : type, unité, options, définition"
+          >
+            Dictionnaire des variables
+          </a>
+          <a className="btn" href={api.templateJsonUrl(templateId)}>
+            Fiche au format JSON
+          </a>
+          <a
+            className="btn btn-primary"
+            href={api.csvUrl(templateId, { delimiter, booleans, labels })}
+          >
+            Télécharger le CSV
+          </a>
+        </div>
       </div>
+
+      <p className="small muted" style={{ maxWidth: '72ch' }}>
+        Le fichier est encodé en UTF-8 avec marque d'ordre des octets, pour
+        qu'Excel affiche correctement les accents. Les variables à choix
+        multiple sont exportées dans une seule colonne, options séparées par
+        « | ».
+      </p>
     </div>
   );
 }

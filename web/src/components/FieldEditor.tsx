@@ -11,6 +11,7 @@ import type {
 } from '../lib/types';
 import { Modal, Spinner, StringListEditor, useToast } from './ui';
 import { RULE_LABELS, RuleEditor, makeRule } from './RuleEditor';
+import { IconAlert, IconCheck, IconEmpty } from './icons';
 
 type Draft = Omit<TemplateField, 'id' | 'templateId' | 'position'> & {
   id?: number;
@@ -137,7 +138,7 @@ export function FieldEditor({
       <div className="stack">
         {problems.length > 0 && (
           <div className="notice notice-warn">
-            <span aria-hidden="true">⚠</span>
+            <IconAlert size={18} />
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {problems.map((p) => (
                 <li key={p}>{p}</li>
@@ -532,14 +533,14 @@ function RuleTestBench({ draft, patients }: { draft: Draft; patients: PatientSum
 
         {error && (
           <div className="notice notice-error" style={{ marginTop: 12 }}>
-            <span aria-hidden="true">⚠</span>
+            <IconAlert size={18} />
             <div>{error}</div>
           </div>
         )}
 
         {result && (
           <div className="notice" style={{ marginTop: 12 }} data-found={result.found}>
-            <span aria-hidden="true">{result.found ? '✓' : '∅'}</span>
+            {result.found ? <IconCheck size={18} /> : <IconEmpty size={18} />}
             <div style={{ flex: 1 }}>
               {result.found ? (
                 <>
