@@ -12,10 +12,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { makeDicom, makeDocx, makeDocxTable, makePdf } from '../test/fixtures.js';
+import { dataDir } from '../src/config.js';
 
 const args = process.argv.slice(2);
 // Le chemin de sortie est le premier argument qui n'est pas un drapeau.
-const OUT_DIR = path.resolve(args.find((a) => !a.startsWith('--')) ?? 'data/demo');
+// Par défaut on écrit dans le répertoire de données de l'application, quel que
+// soit le dossier depuis lequel le script est lancé.
+const OUT_DIR = path.resolve(args.find((a) => !a.startsWith('--')) ?? path.join(dataDir, 'demo'));
 const UPLOAD = args.includes('--upload');
 const API = process.env.API_URL ?? 'http://localhost:4000';
 const COUNT = 24;
