@@ -129,7 +129,43 @@ function compteRendu(p: DemoPatient): string[] {
   ];
 }
 
+/**
+ * Vérifie que l'API répond avant de commencer.
+ *
+ * `--upload` passe par l'API : sans ce contrôle, l'échec survient au premier
+ * dossier, après écriture partielle, et se présente sous la forme d'une pile
+ * d'appels `fetch failed` qui n'indique pas quoi faire.
+ */
+async function checkServer(): Promise<void> {
+  try {
+    const res = await fetch(`${API}/api/health`);
+    if (res.ok) return;
+    throw new Error(`réponse ${res.status}`);
+  } catch {
+    console.error(
+      [
+        `L'API ne répond pas sur ${API}.`,
+        '',
+        "L'option --upload envoie les dossiers à l'application : celle-ci doit",
+        'donc tourner. Ouvrez un second terminal, laissez « npm start » actif',
+        'dans le premier, puis relancez cette commande.',
+        '',
+        'Autre possibilité : générer les fichiers sans les importer,',
+        '',
+        '  npm run demo --workspace server',
+        '',
+        `puis glisser le dossier ${OUT_DIR} dans l'écran « Importer des dossiers ».`,
+      ].join('\n'),
+    );
+    process.exit(1);
+  }
+}
+
 async function main(): Promise<void> {
+  // Contrôlé avant toute écriture, pour ne pas laisser une arborescence
+  // à moitié générée derrière soi.
+  if (UPLOAD) await checkServer();
+
   await fs.rm(OUT_DIR, { recursive: true, force: true });
   await fs.mkdir(OUT_DIR, { recursive: true });
 
@@ -227,7 +263,14 @@ async function uploadPatient(
   if (!res.ok) throw new Error(`Import de ${code} impossible : ${res.status}`);
 }
 
-main().catch((err) => {
-  console.error(err);
+main().catch((err: unknown) => {
+  // Une coupure en cours d'import mérite le même message que l'absence
+  // initiale de serveur : c'est la même cause.
+  const cause = (err as { cause?: { code?: string } })?.cause;
+  if (cause?.code === 'ECONNREFUSED') {
+    console.error(`L'API a cessé de répondre sur ${API}. Vérifiez que « npm start » tourne toujours.`);
+  } else {
+    console.error(err);
+  }
   process.exit(1);
 });

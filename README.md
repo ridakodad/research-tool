@@ -68,12 +68,22 @@ npm run dev          # front sur 5173, API sur 4000
 Pour découvrir l'application avec des données factices :
 
 ```bash
+npm run demo --workspace server           # écrit 24 dossiers dans data/demo/
+```
+
+Glissez ensuite `data/demo/` dans l'écran « Importer des dossiers » — c'est
+aussi l'occasion d'essayer l'import tel qu'il se pratique.
+
+Pour aller plus vite, l'option `--upload` importe directement via l'API. Elle
+suppose donc que l'application **tourne déjà** : laissez `npm start` actif dans
+un premier terminal et lancez la commande dans un second.
+
+```bash
 npm run demo --workspace server -- --upload
 ```
 
-Cela crée 24 dossiers patients synthétiques dans `data/demo/` et les importe.
-Sans `--upload`, les fichiers sont seulement écrits sur le disque et vous
-pouvez les glisser dans l'interface pour essayer l'import.
+Dans les deux cas, il reste à cliquer sur « Lancer l'extraction » depuis
+l'écran « Dossiers patients ».
 
 Une fiche d'exploitation générale est fournie au premier démarrage (identité,
 antécédents, clinique, paraclinique, prise en charge, évolution). Elle est
