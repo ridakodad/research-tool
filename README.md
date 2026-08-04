@@ -48,10 +48,16 @@ remplissage, export CSV et dictionnaire des variables.
 ## Démarrage
 
 ```bash
-npm install          # Node 20 ou plus récent
+npm install          # Node 22 ou plus récent
 npm run build
 npm start            # http://localhost:4000
 ```
+
+L'installation ne compile aucun module natif : le stockage s'appuie sur le
+module SQLite intégré à Node, il n'y a donc ni chaîne de compilation C++ ni
+outils Visual Studio à installer. Sous Node 22, Node affiche au démarrage un
+avertissement indiquant que ce module est expérimental ; il disparaît à partir
+de Node 24, où il est stable.
 
 En développement (front et API séparés, rechargement à chaud) :
 
@@ -213,7 +219,7 @@ ailleurs des obligations réglementaires applicables à votre étude.
 ## Architecture
 
 ```
-server/          API Node/TypeScript, SQLite (better-sqlite3)
+server/          API Node/TypeScript, SQLite (module intégré `node:sqlite`)
   src/extract/   Un extracteur par format + service OCR
   src/engine/    Moteur de règles : repliage, typage, application
   src/repo/      Accès aux données
