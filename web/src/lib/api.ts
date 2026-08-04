@@ -1,5 +1,6 @@
 import type {
   Capabilities,
+  ExtractionMode,
   CompletenessField,
   DatasetRow,
   DocumentMeta,
@@ -145,7 +146,12 @@ export const api = {
     patientId: number,
     values: { fieldId: number; value: FieldValue }[],
   ) => put<{ record: PatientRecord }>(`/records/${templateId}/${patientId}/values`, { values }),
-  runExtraction: (body: { templateId?: number; patientIds?: number[]; overwriteManual?: boolean }) =>
+  runExtraction: (body: {
+    templateId?: number;
+    patientIds?: number[];
+    overwriteManual?: boolean;
+    mode?: ExtractionMode;
+  }) =>
     post<ExtractionRunResult>('/records/extraction/run', body),
 
   // --------------------------------------------------------------- résultats

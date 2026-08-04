@@ -5,6 +5,7 @@ import { getActiveTemplate, getTemplate } from '../repo/templates.js';
 import { getPatient, listPatients } from '../repo/patients.js';
 import { ensureRecord, setValues, type ValueInput } from '../repo/records.js';
 import { runExtractionForPatient, type PatientExtractionReport } from '../engine/run.js';
+import { llmStatus } from '../engine/llm.js';
 import type { FieldValue, TemplateField, TemplateWithFields } from '../domain/types.js';
 
 export const recordsRouter = Router();
@@ -88,18 +89,47 @@ recordsRouter.post(
 
     if (targets.length === 0) throw badRequest('Aucun dossier patient à traiter.');
 
-    const reports: PatientExtractionReport[] = targets.map((patient) =>
-      runExtractionForPatient(template, patient, { overwriteManual: input.overwriteManual }),
-    );
+    const mode = input.mode ?? 'rules';
+    if (mode !== 'rules' && !llmStatus().available) {
+      throw badRequest(
+        `Extraction par Claude indisponible : ${llmStatus().reason ?? 'configuration incomplète'}`,
+      );
+    }
+
+    // Les dossiers sont traités en série : l'extraction par modèle est
+    // soumise à une limite de débit, et la progression reste lisible.
+    const reports: PatientExtractionReport[] = [];
+    for (const patient of targets) {
+      reports.push(
+        await runExtractionForPatient(template, patient, {
+          mode,
+          overwriteManual: input.overwriteManual,
+        }),
+      );
+    }
+
+    const sum = (pick: (r: PatientExtractionReport) => number) =>
+      reports.reduce((total, r) => total + pick(r), 0);
 
     res.json({
       templateId: template.id,
+      mode,
       patientsProcessed: reports.length,
       totals: {
-        extracted: reports.reduce((s, r) => s + r.extracted, 0),
-        notFound: reports.reduce((s, r) => s + r.notFound, 0),
-        keptManual: reports.reduce((s, r) => s + r.keptManual, 0),
+        extracted: sum((r) => r.extracted),
+        notFound: sum((r) => r.notFound),
+        keptManual: sum((r) => r.keptManual),
+        unverified: sum((r) => r.unverified),
+        invalid: sum((r) => r.invalid),
       },
+      // Consommation cumulée, pour que le coût d'une passe soit visible.
+      usage: mode === 'rules' ? null : {
+        inputTokens: sum((r) => r.usage?.inputTokens ?? 0),
+        outputTokens: sum((r) => r.usage?.outputTokens ?? 0),
+        cacheReadTokens: sum((r) => r.usage?.cacheReadTokens ?? 0),
+        cacheWriteTokens: sum((r) => r.usage?.cacheWriteTokens ?? 0),
+      },
+      errors: reports.filter((r) => r.llmError).map((r) => ({ patientCode: r.patientCode, message: r.llmError })),
       reports,
     });
   }),

@@ -13,7 +13,13 @@ import {
   useToast,
 } from '../components/ui';
 import { StatTile } from '../components/charts/StatTile';
-import type { Capabilities, ExtractionRunResult, PatientSummary, TemplateWithFields } from '../lib/types';
+import type {
+  Capabilities,
+  ExtractionMode,
+  ExtractionRunResult,
+  PatientSummary,
+  TemplateWithFields,
+} from '../lib/types';
 
 export function DossiersPage() {
   const toast = useToast();
@@ -26,6 +32,7 @@ export function DossiersPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [running, setRunning] = useState(false);
   const [lastRun, setLastRun] = useState<ExtractionRunResult | null>(null);
+  const [mode, setMode] = useState<ExtractionMode>('rules');
 
   const load = useCallback(async () => {
     try {
@@ -51,7 +58,7 @@ export function DossiersPage() {
     if (!template) return;
     setRunning(true);
     try {
-      const result = await api.runExtraction({ templateId: template.id });
+      const result = await api.runExtraction({ templateId: template.id, mode });
       setLastRun(result);
       toast.success(
         `Extraction terminée : ${result.totals.extracted} valeurs trouvées sur ${plural(result.patientsProcessed, 'dossier')}.`,
@@ -76,6 +83,8 @@ export function DossiersPage() {
 
   if (error) return <ErrorPanel message={error} onRetry={() => void load()} />;
   if (!patients) return <LoadingPanel />;
+
+  const llmReady = capabilities?.llm.available ?? false;
 
   const needle = search.trim().toLowerCase();
   const filtered = needle
@@ -153,33 +162,121 @@ export function DossiersPage() {
               Applique la fiche « {template?.name ?? '—'} » à l'ensemble des dossiers.
             </span>
             <div className="card-actions">
-              <button className="btn-primary" onClick={runExtraction} disabled={running || !template}>
+              <div>
+                <label htmlFor="extraction-mode" style={{ marginBottom: 4 }}>
+                  Moteur
+                </label>
+                <select
+                  id="extraction-mode"
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as ExtractionMode)}
+                  style={{ minWidth: 230 }}
+                >
+                  <option value="rules">Règles seules — gratuit, reproductible</option>
+                  <option value="hybrid" disabled={!llmReady}>
+                    Règles puis Claude — recommandé
+                  </option>
+                  <option value="llm" disabled={!llmReady}>
+                    Claude seul
+                  </option>
+                </select>
+              </div>
+              <button
+                className="btn-primary"
+                onClick={runExtraction}
+                disabled={running || !template}
+                style={{ alignSelf: 'flex-end' }}
+              >
                 {running ? <Spinner label="Extraction…" /> : 'Lancer l’extraction'}
               </button>
             </div>
           </div>
-          {lastRun && (
-            <div className="card-body">
-              <div className="row" style={{ gap: 20 }}>
-                <span>
-                  <strong>{lastRun.totals.extracted}</strong>{' '}
-                  <span className="secondary">valeurs extraites</span>
-                </span>
-                <span>
-                  <strong>{lastRun.totals.notFound}</strong>{' '}
-                  <span className="secondary">non trouvées</span>
-                </span>
-                <span>
-                  <strong>{lastRun.totals.keptManual}</strong>{' '}
-                  <span className="secondary">saisies manuelles préservées</span>
-                </span>
+
+          <div className="card-body stack">
+            {!llmReady && (
+              <div className="notice">
+                <span aria-hidden="true">ℹ</span>
+                <div>
+                  <strong>Extraction par Claude non configurée.</strong> Les règles traitent les
+                  libellés ; Claude traite en plus le texte rédigé, où aucun libellé n'annonce la
+                  valeur. Renseignez <span className="mono">ANTHROPIC_API_KEY</span> dans
+                  l'environnement du serveur pour l'activer.
+                  {capabilities?.llm.reason && (
+                    <div className="small muted" style={{ marginTop: 4 }}>
+                      Détail : {capabilities.llm.reason}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="small muted" style={{ marginTop: 8 }}>
-                Les valeurs corrigées à la main ne sont jamais écrasées par une nouvelle
-                extraction. Ouvrez un dossier pour vérifier chaque valeur et sa source.
+            )}
+
+            {llmReady && mode !== 'rules' && (
+              <div className="small muted">
+                Modèle {capabilities?.llm.model} · effort {capabilities?.llm.effort}. Chaque valeur
+                proposée doit citer un extrait retrouvé dans le document, sinon elle est écartée.
               </div>
-            </div>
-          )}
+            )}
+
+            {lastRun && (
+              <div>
+                <div className="row" style={{ gap: 20 }}>
+                  <span>
+                    <strong>{lastRun.totals.extracted}</strong>{' '}
+                    <span className="secondary">valeurs extraites</span>
+                  </span>
+                  <span>
+                    <strong>{lastRun.totals.notFound}</strong>{' '}
+                    <span className="secondary">non trouvées</span>
+                  </span>
+                  <span>
+                    <strong>{lastRun.totals.keptManual}</strong>{' '}
+                    <span className="secondary">saisies manuelles préservées</span>
+                  </span>
+                  {lastRun.totals.unverified > 0 && (
+                    <span title="Valeurs proposées par Claude sans citation retrouvable dans les documents">
+                      <strong>{lastRun.totals.unverified}</strong>{' '}
+                      <span className="secondary">écartées, non justifiées</span>
+                    </span>
+                  )}
+                  {lastRun.totals.invalid > 0 && (
+                    <span title="Valeurs incompatibles avec le type ou les options de la fiche">
+                      <strong>{lastRun.totals.invalid}</strong>{' '}
+                      <span className="secondary">écartées, hors format</span>
+                    </span>
+                  )}
+                </div>
+
+                {lastRun.usage && (
+                  <div className="small muted" style={{ marginTop: 8 }}>
+                    Jetons consommés : {lastRun.usage.inputTokens.toLocaleString('fr-FR')} en
+                    entrée ({lastRun.usage.cacheReadTokens.toLocaleString('fr-FR')} lus depuis le
+                    cache), {lastRun.usage.outputTokens.toLocaleString('fr-FR')} en sortie.
+                  </div>
+                )}
+
+                {lastRun.errors.length > 0 && (
+                  <div className="notice notice-warn" style={{ marginTop: 10 }}>
+                    <span aria-hidden="true">⚠</span>
+                    <div>
+                      <strong>{lastRun.errors.length} dossier(s) non traités par Claude.</strong>
+                      <ul style={{ margin: '6px 0 0', paddingLeft: 18 }} className="small">
+                        {lastRun.errors.slice(0, 5).map((e) => (
+                          <li key={e.patientCode}>
+                            {e.patientCode} — {e.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                <div className="small muted" style={{ marginTop: 8 }}>
+                  Les valeurs corrigées à la main ne sont jamais écrasées par une nouvelle
+                  extraction. Ouvrez un dossier pour vérifier chaque valeur et sa source.
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

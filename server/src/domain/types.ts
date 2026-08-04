@@ -189,7 +189,8 @@ export interface Evidence {
   rule: string;
 }
 
-export type ValueSource = 'auto' | 'manual' | 'empty';
+/** Origine d'une valeur : règle, modèle de langage, saisie manuelle, ou absente. */
+export type ValueSource = 'auto' | 'llm' | 'manual' | 'empty';
 
 export interface RecordValue {
   fieldId: number;

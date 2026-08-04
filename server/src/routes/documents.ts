@@ -6,6 +6,7 @@ import multer from 'multer';
 import { maxUploadBytes, uploadsDir } from '../config.js';
 import { parseDocument } from '../extract/index.js';
 import { ocrStatus } from '../extract/ocr.js';
+import { llmStatus } from '../engine/llm.js';
 import { asyncHandler, badRequest, intParam, notFound } from '../lib/http.js';
 import {
   deleteDocument,
@@ -212,6 +213,6 @@ documentsRouter.delete(
 documentsRouter.get(
   '/documents-capabilities',
   asyncHandler(async (_req, res) => {
-    res.json({ ocr: await ocrStatus(), maxUploadBytes });
+    res.json({ ocr: await ocrStatus(), llm: llmStatus(), maxUploadBytes });
   }),
 );

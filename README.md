@@ -32,11 +32,12 @@ votre étude, organisée en sections. Chaque variable a un type (texte, nombre,
 entier, date, oui/non, choix unique, choix multiple), une unité, une définition,
 et — c'est le cœur — la façon dont elle se retrouve dans les documents.
 
-**3. Extraire.** Une passe applique la fiche à tous les dossiers. Chaque valeur
+**3. Extraire.** Une passe applique la fiche à tous les dossiers, par des
+**règles** que vous paramétrez, par **Claude**, ou par les deux. Chaque valeur
 trouvée conserve **le document et l'extrait qui la justifient**.
 
-**4. Relire.** Dossier par dossier, chaque variable affiche son origine
-(automatique ou vérifiée), sa confiance, et sa justification. Une valeur
+**4. Relire.** Dossier par dossier, chaque variable affiche son origine (règle,
+Claude, ou relecture humaine), sa confiance, et sa justification. Une valeur
 corrigée à la main est marquée comme telle et **n'est jamais écrasée** par une
 extraction ultérieure.
 
@@ -159,6 +160,87 @@ justificatif s'affichent immédiatement.
 
 ---
 
+## Remplissage automatique par Claude
+
+Les règles excellent sur ce qui est structuré — `Âge : 54 ans`, un tableau de
+biologie, un tag DICOM. Elles atteignent leur limite sur le texte rédigé, où
+l'information n'est introduite par aucun libellé : *« patient de 54 ans adressé
+pour une dyspnée d'effort évoluant depuis six mois »*. C'est là que Claude prend
+le relais.
+
+### Les trois modes d'extraction
+
+Le mode se choisit dans l'écran « Dossiers patients », avant de lancer la passe.
+
+| Mode | Ce qu'il fait | Quand l'utiliser |
+|---|---|---|
+| **Règles seules** | N'applique que votre paramétrage | Par défaut. Gratuit, hors connexion, reproductible |
+| **Règles puis Claude** | Les règles d'abord ; Claude ne reçoit que les variables restées vides | Le meilleur rapport coût/rendement |
+| **Claude seul** | Soumet toute la fiche au modèle | Comparer les deux approches, ou démarrer une étude sans avoir encore écrit de règles |
+
+Le mode mixte est celui à privilégier : ce qu'une règle a trouvé n'est pas
+renvoyé au modèle, ce qui réduit d'autant le texte facturé et laisse la
+reproductibilité des règles là où elle est acquise.
+
+### Ce qui empêche une valeur inventée d'entrer dans le jeu de données
+
+Un modèle qui comble une case vide par une valeur plausible est plus coûteux
+qu'une case restée vide : l'erreur devient invisible à l'analyse. Toute valeur
+proposée franchit donc **deux contrôles indépendants** avant d'être enregistrée.
+
+1. **Citation retrouvée.** Le modèle doit accompagner chaque valeur d'un extrait
+   recopié du document. Cet extrait est **recherché dans le texte réellement
+   extrait du dossier** : introuvable, la valeur est écartée. La comparaison
+   tolère la casse, les accents et la mise en forme — un modèle ne recopie pas
+   les sauts de ligne d'un PDF à l'identique — mais rien d'autre. Une valeur
+   courte (« 54 ») sans citation est écartée elle aussi : la retrouver quelque
+   part dans un compte rendu ne justifie rien.
+2. **Typage par la fiche.** La valeur passe ensuite par le même contrôle que
+   celles des règles : type déclaré, liste d'options, bornes de plausibilité.
+   Un `sexe` hors liste ou un âge de 540 ans est écarté.
+
+L'extrait affiché en relecture est **celui du document**, pas celui recopié par
+le modèle. Le compte des valeurs écartées — sans citation, ou non conformes à la
+fiche — est affiché à la fin de la passe : c'est une indication utile sur la
+qualité des documents et sur le paramétrage de la fiche.
+
+Une valeur retenue est marquée `Claude` avec sa confiance (90 % si la citation
+elle-même a été retrouvée, 75 % si seule la valeur l'a été), distincte de
+`Règle` et de `Vérifié`. Le filtre « à relire » de l'écran de relecture reste le
+passage obligé : **rien de ce qui vient d'un modèle ne devrait entrer dans une
+publication sans relecture humaine.**
+
+### Configuration
+
+Le mode est indisponible tant qu'aucune clé API n'est renseignée ; l'interface
+l'indique et n'active que le mode « Règles seules ».
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...    # Windows : setx ANTHROPIC_API_KEY sk-ant-...
+npm start
+```
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | — | Clé API. Sans elle, seules les règles sont disponibles |
+| `LLM_MODEL` | `claude-opus-5` | Modèle utilisé |
+| `LLM_EFFORT` | `high` | Profondeur de raisonnement. `medium` ou `low` réduisent le coût sur de grandes séries |
+| `LLM_MAX_CHARS_PER_DOC` | `60000` | Texte transmis par document, pour borner le coût d'un dossier volumineux. Au-delà, le document est tronqué et signalé comme tel au modèle |
+| `LLM_MAX_TOKENS` | `16000` | Plafond de génération |
+
+### Coût
+
+Un appel par dossier patient. La consigne et le dictionnaire des variables sont
+identiques d'un dossier à l'autre : ils sont mis en cache et ne sont facturés au
+tarif plein qu'une fois par série. Le reste dépend de la longueur des documents.
+Le décompte des jetons consommés — dont la part lue depuis le cache — s'affiche
+à la fin de chaque passe.
+
+Une série se lance sur un sous-ensemble de dossiers : commencez par quelques-uns
+pour mesurer le coût et la qualité avant d'engager la cohorte entière.
+
+---
+
 ## Export
 
 - **CSV du jeu de données** — séparateur `;` (Excel français) ou `,` (R,
@@ -208,6 +290,9 @@ concerné. Convertir ces PDF en images avant import contourne la limite.
 | `MAX_UPLOAD_BYTES` | `200 Mo` | Taille maximale d'un fichier |
 | `CORS_ORIGINS` | `localhost:5173` | Origines autorisées (développement) |
 
+Les variables propres à l'OCR et à l'extraction par Claude sont documentées dans
+leurs sections respectives.
+
 Les documents importés sont conservés tels quels sous `DATA_DIR/uploads/`, sous
 un nom généré ; le nom d'origine reste affiché dans l'interface.
 
@@ -218,7 +303,19 @@ un nom généré ; le nom d'origine reste affiché dans l'interface.
 L'application ne comporte ni authentification ni chiffrement : elle est prévue
 pour un poste de travail ou un serveur d'établissement maîtrisé, pas pour une
 exposition publique. Les documents importés et la base restent sur la machine
-qui l'héberge, aucune donnée ne sort vers un service tiers.
+qui l'héberge.
+
+**L'extraction par Claude fait exception, et c'est la seule.** Dans les modes
+« Règles puis Claude » et « Claude seul », le texte des documents concernés est
+transmis à l'API d'Anthropic pour y être analysé. C'est une sortie de données
+hors de votre établissement : elle relève des mêmes autorisations que tout
+traitement externalisé de données de santé, et elle doit être arbitrée avant
+usage, pas après. En mode « Règles seules » — le mode par défaut — aucune donnée
+ne quitte la machine. Sans clé API renseignée, les deux autres modes sont
+indisponibles.
+
+Ne transmettez que des documents pseudonymisés. L'application n'anonymise pas
+les documents à votre place : ce qu'ils contiennent est ce qui est envoyé.
 
 Utilisez des identifiants anonymisés comme codes de dossier — ils constituent
 la clé du jeu de données exporté. Le traitement de données de santé relève par
@@ -231,7 +328,8 @@ ailleurs des obligations réglementaires applicables à votre étude.
 ```
 server/          API Node/TypeScript, SQLite (module intégré `node:sqlite`)
   src/extract/   Un extracteur par format + service OCR
-  src/engine/    Moteur de règles : repliage, typage, application
+  src/engine/    Moteurs d'extraction : repliage, typage, règles, appel à Claude
+                 et vérification des citations
   src/repo/      Accès aux données
   src/routes/    API HTTP
   test/          Tests unitaires et d'intégration
@@ -252,7 +350,12 @@ origine.
 npm test
 ```
 
-82 tests couvrent le moteur (repliage, typage, chacune des familles de règles,
+100 tests couvrent le moteur (repliage, typage, chacune des familles de règles,
 négation, robustesse aux motifs invalides) et la chaîne complète — import,
 extraction, correction, export — sur de vrais fichiers PDF, DOCX et DICOM
 construits par les fixtures.
+
+L'appel réseau à l'API n'est pas exercé par les tests. Ce qui l'est, c'est tout
+ce qui l'entoure et qui décide de ce qui entre dans le jeu de données : le
+schéma imposé au modèle, la recherche des citations dans les documents, et le
+tri entre valeurs retenues et valeurs écartées.

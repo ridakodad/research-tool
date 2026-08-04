@@ -126,7 +126,10 @@ export function ResultatsPage() {
             <StatTile
               label="Valeurs vérifiées"
               value={countBySource(rows, 'manual')}
-              hint={`${countBySource(rows, 'auto')} issues de l'extraction`}
+              hint={
+                `${countBySource(rows, 'auto')} par règle` +
+                (countBySource(rows, 'llm') > 0 ? `, ${countBySource(rows, 'llm')} par Claude` : '')
+              }
             />
           </div>
 
@@ -167,7 +170,7 @@ export function ResultatsPage() {
   );
 }
 
-function countBySource(rows: DatasetRow[], source: 'manual' | 'auto'): number {
+function countBySource(rows: DatasetRow[], source: 'manual' | 'auto' | 'llm'): number {
   return rows.reduce(
     (sum, row) => sum + Object.values(row.sources).filter((s) => s === source).length,
     0,
@@ -218,7 +221,11 @@ function RawTable({ template, rows }: { template: TemplateWithFields; rows: Data
       <div className="row small secondary" style={{ gap: 16 }}>
         <span className="row" style={{ gap: 6 }}>
           <span className="dot" style={{ background: 'var(--series-1)' }} />
-          Extraction automatique
+          Règle d'extraction
+        </span>
+        <span className="row" style={{ gap: 6 }}>
+          <span className="dot" style={{ background: 'var(--series-2)' }} />
+          Proposé par Claude
         </span>
         <span className="row" style={{ gap: 6 }}>
           <span className="dot" style={{ background: 'var(--good)' }} />
@@ -261,9 +268,11 @@ function RawTable({ template, rows }: { template: TemplateWithFields; rows: Data
                   const color =
                     source === 'manual'
                       ? 'var(--good)'
-                      : source === 'auto'
-                        ? 'var(--series-1)'
-                        : 'var(--border-strong)';
+                      : source === 'llm'
+                        ? 'var(--series-2)'
+                        : source === 'auto'
+                          ? 'var(--series-1)'
+                          : 'var(--border-strong)';
                   return (
                     <td key={field.id}>
                       <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
@@ -382,7 +391,8 @@ function CompletenessPanel({
               <th>Variable</th>
               <th>Section</th>
               <th style={{ width: '28%' }}>Taux de remplissage</th>
-              <th className="num">Automatique</th>
+              <th className="num">Règle</th>
+              <th className="num">Claude</th>
               <th className="num">Vérifié</th>
               <th className="num">Vide</th>
             </tr>
@@ -403,10 +413,11 @@ function CompletenessPanel({
                 <td>
                   <Meter value={field.rate} />
                   <div className="small muted" style={{ marginTop: 4 }}>
-                    {field.rate} % ({field.auto + field.manual}/{patientCount})
+                    {field.rate} % ({field.auto + field.llm + field.manual}/{patientCount})
                   </div>
                 </td>
                 <td className="num">{field.auto}</td>
+                <td className="num">{field.llm || '—'}</td>
                 <td className="num">{field.manual}</td>
                 <td className="num">{field.empty || '—'}</td>
               </tr>

@@ -152,6 +152,8 @@ export const extractionRunSchema = z.object({
   patientIds: z.array(z.number().int().positive()).optional(),
   /** Écrase aussi les valeurs corrigées manuellement. */
   overwriteManual: z.boolean().optional(),
+  /** Moteur employé : règles seules, Claude seul, ou les règles puis Claude. */
+  mode: z.enum(['rules', 'llm', 'hybrid']).optional(),
 });
 
 export const reorderSchema = z.object({

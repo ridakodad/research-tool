@@ -1,4 +1,4 @@
-import type { FieldValue, TemplateField } from '../lib/types';
+import type { FieldValue, TemplateField, ValueSource } from '../lib/types';
 
 /**
  * Contrôle de saisie adapté au type de la variable.
@@ -120,17 +120,15 @@ export function SourceBadge({
   source,
   confidence,
 }: {
-  source: 'auto' | 'manual' | 'empty' | undefined;
+  source: ValueSource | undefined;
   confidence?: number | null;
 }) {
   if (source === 'manual') return <span className="badge badge-manual">Vérifié</span>;
-  if (source === 'auto') {
-    return (
-      <span className="badge badge-auto">
-        Automatique
-        {confidence != null && ` · ${Math.round(confidence * 100)} %`}
-      </span>
-    );
-  }
+  const percent = confidence != null ? ` · ${Math.round(confidence * 100)} %` : '';
+  // Une valeur proposée par un modèle se distingue d'une valeur trouvée par
+  // une règle : la seconde est reproductible, la première demande une
+  // relecture plus attentive.
+  if (source === 'llm') return <span className="badge badge-llm">Claude{percent}</span>;
+  if (source === 'auto') return <span className="badge badge-auto">Règle{percent}</span>;
   return <span className="badge badge-empty">Non renseigné</span>;
 }

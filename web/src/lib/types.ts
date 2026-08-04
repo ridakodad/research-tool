@@ -135,7 +135,8 @@ export interface Evidence {
   rule: string;
 }
 
-export type ValueSource = 'auto' | 'manual' | 'empty';
+/** Origine d'une valeur : règle, modèle de langage, saisie manuelle, ou absente. */
+export type ValueSource = 'auto' | 'llm' | 'manual' | 'empty';
 
 export interface RecordValue {
   fieldId: number;
@@ -205,7 +206,17 @@ export type FieldStats =
 
 export interface CompletenessField {
   key: string; label: string; section: string; required: boolean;
-  auto: number; manual: number; empty: number; rate: number;
+  auto: number; llm: number; manual: number; empty: number; rate: number;
+}
+
+/** Moteur employé pour une passe d'extraction. */
+export type ExtractionMode = 'rules' | 'llm' | 'hybrid';
+
+export interface LlmUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
 }
 
 export interface ExtractionReport {
@@ -215,19 +226,33 @@ export interface ExtractionReport {
   extracted: number;
   notFound: number;
   keptManual: number;
+  unverified: number;
+  invalid: number;
+  llmError: string | null;
+  usage: LlmUsage | null;
   fields: {
     fieldId: number;
     key: string;
     label: string;
     status: 'extracted' | 'not-found' | 'kept-manual' | 'disabled';
+    by: 'rules' | 'llm' | null;
     confidence: number | null;
   }[];
 }
 
 export interface ExtractionRunResult {
   templateId: number;
+  mode: ExtractionMode;
   patientsProcessed: number;
-  totals: { extracted: number; notFound: number; keptManual: number };
+  totals: {
+    extracted: number;
+    notFound: number;
+    keptManual: number;
+    unverified: number;
+    invalid: number;
+  };
+  usage: LlmUsage | null;
+  errors: { patientCode: string; message: string }[];
   reports: ExtractionReport[];
 }
 
@@ -241,5 +266,6 @@ export interface RuleTestResult {
 
 export interface Capabilities {
   ocr: { available: boolean; lang: string; reason: string | null };
+  llm: { available: boolean; model: string; effort: string; reason: string | null };
   maxUploadBytes: number;
 }

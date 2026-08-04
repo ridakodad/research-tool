@@ -275,12 +275,14 @@ analyticsRouter.get(
 
     const fields = template.fields.map((field) => {
       let auto = 0;
+      let llm = 0;
       let manual = 0;
       let empty = 0;
       for (const row of rows) {
         const source = row.sources[field.key];
         if (isEmpty(row.values[field.key] ?? null)) empty++;
         else if (source === 'manual') manual++;
+        else if (source === 'llm') llm++;
         else auto++;
       }
       return {
@@ -289,9 +291,10 @@ analyticsRouter.get(
         section: field.section,
         required: field.required,
         auto,
+        llm,
         manual,
         empty,
-        rate: rows.length > 0 ? Math.round(((auto + manual) / rows.length) * 100) : 0,
+        rate: rows.length > 0 ? Math.round(((auto + llm + manual) / rows.length) * 100) : 0,
       };
     });
 

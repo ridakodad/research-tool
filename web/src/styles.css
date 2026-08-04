@@ -264,6 +264,7 @@ tbody tr:hover .table-sticky-col { background: var(--surface-2); }
 }
 .badge-auto { color: var(--series-1); border-color: var(--series-1); }
 .badge-manual { color: var(--good-text); border-color: var(--good); }
+.badge-llm { color: var(--series-2); border-color: var(--series-2); }
 .badge-empty { color: var(--text-muted); }
 .badge-error { color: var(--critical); border-color: var(--critical); }
 .badge-warn { color: var(--text-primary); border-color: var(--warning); }

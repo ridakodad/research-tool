@@ -13,6 +13,7 @@
     "demo": "tsx scripts/generate-demo.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@tesseract.js-data/fra": "^1.0.0",
     "cors": "^2.8.5",
     "dicom-parser": "^1.8.21",
