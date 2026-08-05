@@ -401,6 +401,37 @@ avec sa casse et sa ponctuation d'origine.
 En production, l'API sert aussi le front compilé : un seul processus, une seule
 origine.
 
+### Avertissement `npm audit` sur react-router
+
+`npm audit` signale une faille **haute** sur `react-router` qui ne peut pas
+être résolue par une mise à jour, et il faut le savoir avant de lancer
+`npm audit fix --force` — qui aggraverait la situation.
+
+Deux avis se recouvrent sans laisser de version saine :
+
+| Avis | Versions touchées | Il faudrait |
+|---|---|---|
+| Redirection ouverte + injection à l'hydratation SSR | 6.0.0 – 7.17.0 | ≥ 7.18.0 |
+| Contournement CSRF **en mode RSC** | 7.12.0 – 8.2.0 | < 7.12.0 ou > 8.2.0 |
+
+La dernière version publiée est 7.18.2 ; aucune 8.x n'existe. Aucune version
+ne satisfait donc les deux conditions. `npm audit fix --force` propose de
+redescendre en 7.11.0, ce qui réintroduit les deux premiers avis.
+
+Le projet reste en **7.18.2**, qui est la meilleure position disponible :
+
+- Les deux premiers avis y sont corrigés.
+- Le troisième ne concerne que le **mode RSC** (React Server Components).
+  Cette application est un client statique : pas de rendu serveur, pas de
+  composants serveur, pas d'actions serveur. Le code vulnérable n'est jamais
+  chargé.
+
+Pour mémoire, les deux premiers avis n'étaient déjà pas atteignables ici :
+aucune destination de navigation ne provient d'une saisie utilisateur, et il
+n'y a pas d'hydratation SSR. La mise à jour a été faite malgré tout.
+
+À revoir dès qu'une version corrigeant le troisième avis paraît.
+
 ### Tests
 
 ```bash
