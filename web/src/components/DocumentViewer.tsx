@@ -18,21 +18,16 @@ import type { DocumentMeta, Evidence } from '../lib/types';
 type Mode = 'apercu' | 'texte';
 
 /**
- * Formats que le navigateur sait afficher lui-même.
- *
- * Décidé sur l'extension, comme côté serveur : le type déclaré à l'import vient
- * du client et se révèle souvent inutilisable. Le SVG est volontairement exclu
- * — le serveur ne le rend jamais en ligne, il s'exécuterait dans l'origine de
- * l'application.
+ * Le serveur décide seul de ce qu'il accepte d'afficher dans la page, et le
+ * calcule sur le nom de stockage. Le client s'y range plutôt que de rejouer la
+ * règle sur un nom d'affichage que l'utilisateur peut avoir renommé.
  */
-const PREVIEWABLE = /\.(pdf|png|jpe?g|gif|webp|bmp|tiff?)$/i;
-
 function hasNativePreview(doc: DocumentMeta): boolean {
-  return PREVIEWABLE.test(doc.filename);
+  return doc.previewable;
 }
 
 function isPdf(doc: DocumentMeta): boolean {
-  return /\.pdf$/i.test(doc.filename);
+  return doc.kind === 'pdf';
 }
 
 export interface ViewerFocus {
@@ -48,16 +43,21 @@ export function DocumentViewer({
   onReparse,
   onDelete,
   onAdd,
+  onRenamed,
 }: {
   documents: DocumentMeta[];
   focus: ViewerFocus | null;
   onReparse: (doc: DocumentMeta) => void;
   onDelete: (doc: DocumentMeta) => void;
   onAdd: () => void;
+  onRenamed: () => void;
 }) {
   const [selectedId, setSelectedId] = useState<number | null>(documents[0]?.id ?? null);
   const [mode, setMode] = useState<Mode>('apercu');
   const [enlarged, setEnlarged] = useState(false);
+  /** Document en cours de renommage. Aucun bouton dédié : le nom se modifie
+      sur place, au double-clic sur son onglet. */
+  const [renaming, setRenaming] = useState<number | null>(null);
 
   const selected = documents.find((d) => d.id === selectedId) ?? documents[0] ?? null;
 
@@ -124,19 +124,32 @@ export function DocumentViewer({
         {/* Sélection du document : une puce par fichier, l'onglet courant marqué. */}
         <div className="doc-tabs" role="tablist" aria-label="Documents du dossier">
           {documents.map((doc) => (
-            <button
-              key={doc.id}
-              role="tab"
-              aria-selected={doc.id === selected.id}
-              className={doc.id === selected.id ? 'doc-tab active' : 'doc-tab'}
-              onClick={() => setSelectedId(doc.id)}
-              title={doc.filename}
-            >
-              <span className="truncate">{doc.filename}</span>
-              {doc.parseStatus !== 'ok' && (
-                <span className="doc-tab-flag" title="Aucun texte exploitable" aria-hidden="true" />
-              )}
-            </button>
+            renaming === doc.id ? (
+              <RenameField
+                key={doc.id}
+                doc={doc}
+                onDone={() => {
+                  setRenaming(null);
+                  onRenamed();
+                }}
+                onCancel={() => setRenaming(null)}
+              />
+            ) : (
+              <button
+                key={doc.id}
+                role="tab"
+                aria-selected={doc.id === selected.id}
+                className={doc.id === selected.id ? 'doc-tab active' : 'doc-tab'}
+                onClick={() => setSelectedId(doc.id)}
+                onDoubleClick={() => setRenaming(doc.id)}
+                title={`${doc.filename} — double-cliquer pour renommer`}
+              >
+                <span className="truncate">{doc.filename}</span>
+                {doc.parseStatus !== 'ok' && (
+                  <span className="doc-tab-flag" title="Aucun texte exploitable" aria-hidden="true" />
+                )}
+              </button>
+            )
           ))}
         </div>
 
@@ -176,7 +189,14 @@ export function DocumentViewer({
             Ouvrir le fichier
           </a>
           <button
-            className="btn-sm"
+            className="btn-sm btn-quiet"
+            onClick={() => setRenaming(selected.id)}
+            title="Donner un nom parlant à ce document"
+          >
+            Renommer
+          </button>
+          <button
+            className="btn-sm btn-quiet"
             onClick={() => onReparse(selected)}
             title="Relancer l'analyse du fichier"
           >
@@ -428,4 +448,54 @@ export function locateEvidence(
   if (core.length === 0) return null;
   const found = text.indexOf(core);
   return found === -1 ? null : { start: found, end: found + core.length };
+}
+
+/**
+ * Renommage sur place.
+ *
+ * Le nom d'un document est une étiquette de travail : « CR opératoire » se
+ * relit mieux que « IMG_2381 » sur trente dossiers. Le fichier, son empreinte
+ * et son texte extrait ne bougent pas — renommer ne peut donc invalider ni une
+ * extraction ni une justification.
+ */
+function RenameField({
+  doc,
+  onDone,
+  onCancel,
+}: {
+  doc: DocumentMeta;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(doc.filename);
+  const [saving, setSaving] = useState(false);
+
+  const commit = async () => {
+    const name = value.trim();
+    if (name.length === 0 || name === doc.filename) return onCancel();
+    setSaving(true);
+    try {
+      await api.renameDocument(doc.id, name);
+      onDone();
+    } catch {
+      // L'échec laisse le nom d'origine : rien n'est perdu.
+      onCancel();
+    }
+  };
+
+  return (
+    <input
+      className="doc-tab-input"
+      autoFocus
+      disabled={saving}
+      value={value}
+      aria-label={`Nouveau nom pour ${doc.filename}`}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => void commit()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') void commit();
+        if (e.key === 'Escape') onCancel();
+      }}
+    />
+  );
 }

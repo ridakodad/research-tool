@@ -169,6 +169,12 @@ export interface DocumentMeta {
   createdAt: string;
   /** Statut du parsing : le texte est extrait à l'upload. */
   parseStatus: 'pending' | 'ok' | 'error' | 'empty';
+  /**
+   * Le navigateur peut-il afficher ce document dans la page ? Calculé côté
+   * serveur à partir du nom de stockage : le renommage ne peut donc pas rendre
+   * un PDF soudain inaffichable, ni un format exécutable soudain affichable.
+   */
+  previewable: boolean;
   parseError: string | null;
   /** Nombre de caractères de texte extraits (aperçu de la qualité du parsing). */
   textLength: number;

@@ -108,6 +108,8 @@ export const api = {
   getDocumentText: (id: number) => get<{ text: string }>(`/documents/${id}/text`),
   documentFileUrl: (id: number) => `/api/documents/${id}/file`,
   reparseDocument: (id: number) => post<{ document: DocumentMeta }>(`/documents/${id}/reparse`),
+  renameDocument: (id: number, filename: string) =>
+    patch<{ document: DocumentMeta }>(`/documents/${id}`, { filename }),
   deleteDocument: (id: number) => del(`/documents/${id}`),
   capabilities: () => get<Capabilities>('/documents-capabilities'),
 
@@ -174,6 +176,8 @@ export const api = {
   csvUrl: (templateId: number, opts: { delimiter: string; booleans: string; labels: boolean }) =>
     `/api/export/csv?templateId=${templateId}&delimiter=${encodeURIComponent(opts.delimiter)}` +
     `&booleans=${opts.booleans}&labels=${opts.labels ? '1' : '0'}`,
+  xlsxUrl: (templateId: number, labels: boolean) =>
+    `/api/export/xlsx?templateId=${templateId}&labels=${labels ? '1' : '0'}`,
   dictionaryUrl: (templateId: number, delimiter: string) =>
     `/api/export/dictionary.csv?templateId=${templateId}&delimiter=${encodeURIComponent(delimiter)}`,
   templateJsonUrl: (templateId: number) => `/api/export/template.json?templateId=${templateId}`,

@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import type { Server } from 'node:http';
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'research-tool-test-'));
@@ -57,6 +58,24 @@ async function api<T = any>(
   });
   const text = await res.text();
   return { status: res.status, data: (text ? JSON.parse(text) : null) as T };
+}
+
+/** Décompresse une archive ZIP en mémoire : { chemin -> contenu }. */
+function readZip(buffer: Buffer): Map<string, Buffer> {
+  const files = new Map<string, Buffer>();
+  let offset = 0;
+  while (offset + 4 <= buffer.length && buffer.readUInt32LE(offset) === 0x04034b50) {
+    const method = buffer.readUInt16LE(offset + 8);
+    const compressed = buffer.readUInt32LE(offset + 18);
+    const nameLength = buffer.readUInt16LE(offset + 26);
+    const extraLength = buffer.readUInt16LE(offset + 28);
+    const name = buffer.subarray(offset + 30, offset + 30 + nameLength).toString('utf8');
+    const start = offset + 30 + nameLength + extraLength;
+    const body = buffer.subarray(start, start + compressed);
+    files.set(name, method === 0 ? body : zlib.inflateRawSync(body));
+    offset = start + compressed;
+  }
+  return files;
 }
 
 async function uploadFiles(
@@ -534,6 +553,69 @@ describe('service du fichier d’origine', () => {
     assert.match(res.headers.get('content-type') ?? '', /application\/octet-stream/);
     assert.match(res.headers.get('content-disposition') ?? '', /^attachment/);
     await res.arrayBuffer();
+  });
+});
+
+describe('export au format classeur', () => {
+  test('le classeur produit est une archive lisible, typée et complète', async () => {
+    const res = await fetch(`${baseUrl}/api/export/xlsx`);
+    assert.equal(res.status, 200);
+    assert.match(
+      res.headers.get('content-type') ?? '',
+      /spreadsheetml\.sheet/,
+      'le type doit être celui d’un classeur',
+    );
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    // Signature ZIP : un classeur illisible échouerait dès l'ouverture.
+    assert.deepEqual([...buffer.subarray(0, 2)], [0x50, 0x4b]);
+
+    const files = readZip(buffer);
+    for (const required of [
+      '[Content_Types].xml',
+      'xl/workbook.xml',
+      'xl/styles.xml',
+      'xl/worksheets/sheet1.xml',
+      'xl/worksheets/sheet2.xml',
+      'xl/worksheets/sheet3.xml',
+    ]) {
+      assert.ok(files.has(required), `partie manquante : ${required}`);
+    }
+
+    const classeur = files.get('xl/workbook.xml')!.toString('utf8');
+    for (const feuille of ['Données', 'Dictionnaire', 'Synthèse']) {
+      assert.ok(classeur.includes(feuille), `feuille absente : ${feuille}`);
+    }
+
+    const feuille1 = files.get('xl/worksheets/sheet1.xml')!.toString('utf8');
+    // En-tête figé et filtre : le jeu de données doit être exploitable dès
+    // l'ouverture, sans manipulation.
+    assert.match(feuille1, /state="frozen"/);
+    assert.match(feuille1, /<autoFilter/);
+    // Un nombre est écrit comme nombre, jamais comme chaîne : c'est tout
+    // l'intérêt du classeur face au CSV. La feuille de synthèse en porte
+    // toujours (effectifs, complétude), quel que soit le jeu de données.
+    const synthese = files.get('xl/worksheets/sheet3.xml')!.toString('utf8');
+    assert.match(synthese, /<c r="C2"><v>\d+<\/v><\/c>/);
+  });
+
+  test('les caractères réservés du XML ne cassent pas le classeur', async () => {
+    // Un compte rendu contient « < », « & », des guillemets. Mal échappés, le
+    // tableur refuse d'ouvrir le fichier.
+    const { data } = await api<any>('POST', '/api/patients', {
+      code: 'PAT-<&"XML>',
+      label: "L'étude « pilote » & suite",
+    });
+    assert.equal(data.patient.id > 0, true);
+
+    const res = await fetch(`${baseUrl}/api/export/xlsx`);
+    const files = readZip(Buffer.from(await res.arrayBuffer()));
+    const feuille1 = files.get('xl/worksheets/sheet1.xml')!.toString('utf8');
+    assert.ok(feuille1.includes('PAT-&lt;&amp;&quot;XML&gt;'), 'le code doit être échappé');
+    // Aucune esperluette laissée nue : c'est la faute qui rend un classeur
+    // impossible à ouvrir, et celle qu'un simple `includes` ne verrait pas.
+    const nue = /&(?!(amp|lt|gt|quot|apos|#\d+);)/.exec(feuille1);
+    assert.equal(nue, null, `esperluette non échappée : ${nue?.input.slice(nue.index, nue.index + 40)}`);
   });
 });
 

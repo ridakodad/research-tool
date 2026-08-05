@@ -13,6 +13,7 @@ import {
   useToast,
 } from '../components/ui';
 import { IconAlert } from '../components/icons';
+import { Panel, PanelGroupControls } from '../components/Panel';
 import { StatTile } from '../components/charts/StatTile';
 import type {
   Capabilities,
@@ -125,7 +126,8 @@ export function DossiersPage() {
           </p>
         </div>
         <div className="page-head-actions">
-          <button onClick={() => setShowCreate(true)}>Nouveau dossier</button>
+          <PanelGroupControls keys={['corpus.extraction', 'corpus.liste']} />
+          <button className="btn-quiet" onClick={() => setShowCreate(true)}>Nouveau dossier</button>
           <button className="btn-primary" onClick={() => setShowImport(true)}>
             Importer des dossiers
           </button>
@@ -171,13 +173,13 @@ export function DossiersPage() {
 
       {patients.length > 0 && (
         /* Cible du raccourci « Extraction » du rail d'outils. */
-        <div className="card anchor-target" id="extraction">
-          <div className="card-head">
-            <h2>Extraction automatique</h2>
-            <span className="sub">
-              Applique la fiche « {template?.name ?? '—'} » à l'ensemble des dossiers.
-            </span>
-            <div className="card-actions">
+        <div className="anchor-target" id="extraction">
+        <Panel
+          id="corpus.extraction"
+          title="Extraction automatique"
+          summary={`Fiche « ${template?.name ?? '—'} »`}
+          actions={
+            <>
               <div>
                 <label htmlFor="extraction-mode" style={{ marginBottom: 4 }}>
                   Moteur
@@ -205,10 +207,10 @@ export function DossiersPage() {
               >
                 {running ? <Spinner label="Extraction…" /> : 'Lancer l’extraction'}
               </button>
-            </div>
-          </div>
-
-          <div className="card-body stack">
+            </>
+          }
+        >
+          <div className="stack">
             {!llmReady && (
               <div className="notice">
                 <span aria-hidden="true">ℹ</span>
@@ -293,24 +295,26 @@ export function DossiersPage() {
               </div>
             )}
           </div>
+        </Panel>
         </div>
       )}
 
-      <div className="card">
-        <div className="card-head">
-          <h2>Liste des dossiers</h2>
-          <span className="sub">{plural(filtered.length, 'dossier')}</span>
-          <div className="card-actions">
-            <input
-              type="search"
-              value={search}
-              placeholder="Rechercher un dossier…"
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ minWidth: 220 }}
-              aria-label="Rechercher un dossier"
-            />
-          </div>
-        </div>
+      <Panel
+        id="corpus.liste"
+        title="Liste des dossiers"
+        summary={plural(filtered.length, 'dossier')}
+        padded={false}
+        actions={
+          <input
+            type="search"
+            value={search}
+            placeholder="Rechercher un dossier…"
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ minWidth: 220 }}
+            aria-label="Rechercher un dossier"
+          />
+        }
+      >
 
         {patients.length === 0 ? (
           <EmptyState
@@ -382,7 +386,7 @@ export function DossiersPage() {
             </table>
           </div>
         )}
-      </div>
+      </Panel>
 
       {showImport && (
         <Modal title="Importer des dossiers patients" onClose={() => setShowImport(false)} width={860}>

@@ -461,8 +461,39 @@ function ExportPanel({ templateId }: { templateId: number }) {
     <div className="stack" style={{ gap: 16 }}>
       <p className="small secondary" style={{ maxWidth: '72ch' }}>
         Le fichier reflète exactement le tableau de données, valeurs relues
-        comprises. Réglez la mise en forme selon le logiciel qui recevra le jeu
-        de données.
+        comprises.
+      </p>
+
+      <div className="export-choice">
+        <div>
+          <h3 style={{ marginBottom: 4 }}>Classeur Excel</h3>
+          <p className="small secondary" style={{ maxWidth: '58ch' }}>
+            Trois feuilles : les données, le dictionnaire des variables, et une
+            synthèse de cohorte avec effectifs, complétude et indicateurs de
+            position. Les types sont portés par le fichier — une date reste une
+            date, un nombre reste un nombre — donc aucun assistant
+            d'importation ni reformatage à l'ouverture.
+          </p>
+        </div>
+        <div className="row" style={{ gap: 8 }}>
+          <label className="checkbox" style={{ marginBottom: 0 }}>
+            <input
+              type="checkbox"
+              checked={labels}
+              onChange={(e) => setLabels(e.target.checked)}
+            />
+            <span>En-têtes en clair</span>
+          </label>
+          <a className="btn btn-primary" href={api.xlsxUrl(templateId, labels)}>
+            Télécharger le classeur
+          </a>
+        </div>
+      </div>
+
+      <h3 style={{ marginTop: 8 }}>Formats texte</h3>
+      <p className="small secondary" style={{ maxWidth: '72ch' }}>
+        Pour R, Python ou SPSS. Réglez la mise en forme selon le logiciel qui
+        recevra le jeu de données.
       </p>
 
       <div className="row" style={{ gap: 20, alignItems: 'flex-end' }}>

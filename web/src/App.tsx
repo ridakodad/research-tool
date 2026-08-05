@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './components/ui';
 import { Brand } from './components/Brand';
@@ -8,6 +9,7 @@ import {
   IconFolders,
   IconForm,
   IconGauge,
+  IconSidebar,
   IconTable,
   IconWorkspace,
 } from './components/icons';
@@ -38,7 +40,7 @@ interface Tool {
   matchPrefix?: string;
 }
 
-function ToolRail() {
+function ToolRail({ collapsed }: { collapsed: boolean }) {
   const { patients, fields, completeness, loading } = useWorkspace();
   const { pathname, search, hash } = useLocation();
 
@@ -109,15 +111,19 @@ function ToolRail() {
   };
 
   return (
-    <nav className="rail" aria-label="Outils de l'espace de recherche">
+    <nav
+      className={collapsed ? 'rail rail-collapsed' : 'rail'}
+      aria-label="Outils de l'espace de recherche"
+    >
       <div className="rail-group">
         <NavLink
           to="/"
           end
           className={({ isActive: active }) => (active ? 'rail-item active' : 'rail-item')}
+          title={collapsed ? 'Plan de travail' : undefined}
         >
           <IconWorkspace />
-          <span>Plan de travail</span>
+          <span className="rail-text">Plan de travail</span>
         </NavLink>
       </div>
 
@@ -137,9 +143,10 @@ function ToolRail() {
                    s'allumeraient donc toutes en même temps. */
                 className={() => (active ? 'rail-item active' : 'rail-item')}
                 aria-current={active ? 'page' : undefined}
+                title={collapsed ? tool.label : undefined}
               >
                 <Icon />
-                <span>{tool.label}</span>
+                <span className="rail-text">{tool.label}</span>
                 {tool.count != null && (
                   <span className="rail-count">
                     {tool.label === 'Complétude' ? `${tool.count} %` : tool.count}
@@ -156,15 +163,36 @@ function ToolRail() {
 
 export function App() {
   const location = useLocation();
+  // Le repli du rail est un réglage de poste de travail : il suit
+  // l'utilisateur d'une session à l'autre.
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem('rail:collapsed') === '1',
+  );
+
+  const toggleRail = () => {
+    setCollapsed((current) => {
+      localStorage.setItem('rail:collapsed', current ? '0' : '1');
+      return !current;
+    });
+  };
 
   return (
     <WorkspaceProvider>
-      <div className="app">
+      <div className={collapsed ? 'app rail-is-collapsed' : 'app'}>
         <a className="skip-link" href="#plan-de-travail">
           Aller au contenu
         </a>
 
         <header className="topbar">
+          <button
+            className="btn-icon btn-quiet"
+            onClick={toggleRail}
+            aria-label={collapsed ? "Déployer le rail d'outils" : "Replier le rail d'outils"}
+            title={collapsed ? 'Déployer les outils' : 'Replier les outils'}
+            aria-expanded={!collapsed}
+          >
+            <IconSidebar size={18} />
+          </button>
           <Brand />
           <div className="topbar-end">
             <ThemeToggle />
@@ -172,7 +200,7 @@ export function App() {
         </header>
 
         <div className="shell">
-          <ToolRail />
+          <ToolRail collapsed={collapsed} />
 
           <main className="canvas" id="plan-de-travail">
             {/* La clé de route rejoue l'animation d'entrée : le changement

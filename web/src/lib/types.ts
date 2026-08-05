@@ -121,6 +121,8 @@ export interface DocumentMeta {
   sha256: string;
   createdAt: string;
   parseStatus: 'pending' | 'ok' | 'error' | 'empty';
+  /** Le serveur accepte-t-il d'afficher ce document dans la page ? */
+  previewable: boolean;
   parseError: string | null;
   textLength: number;
   metadata: Record<string, unknown>;

@@ -322,6 +322,7 @@ export function DossierDetailPage() {
           onAdd={() => setShowImport(true)}
           onReparse={(doc) => void reparse(doc)}
           onDelete={(doc) => void removeDocument(doc)}
+          onRenamed={() => void load()}
         />
       </div>
 

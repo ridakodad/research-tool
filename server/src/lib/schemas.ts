@@ -135,6 +135,24 @@ export const patientInputSchema = z.object({
 
 export const patientUpdateSchema = patientInputSchema.partial();
 
+/**
+ * Renommage d'un document.
+ *
+ * Le nom est affiché tel quel et sert de titre d'onglet : on refuse donc toute
+ * composante de chemin, qui n'aurait aucun sens ici et brouillerait la lecture.
+ * Le fichier sur disque garde son nom généré, ce nom n'est qu'une étiquette.
+ */
+export const documentUpdateSchema = z.object({
+  filename: z
+    .string()
+    .trim()
+    .min(1, 'Le nom ne peut pas être vide.')
+    .max(255)
+    .refine((v) => !v.includes('/') && !v.includes('\\'), {
+      message: 'Le nom ne peut pas contenir de séparateur de chemin.',
+    }),
+});
+
 export const valueUpdateSchema = z.object({
   values: z
     .array(

@@ -156,6 +156,45 @@ export function IconAlert(props: IconProps) {
   );
 }
 
+/** Chevron d'ouverture : pointe à droite fermé, vers le bas ouvert. */
+export function IconChevron(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m9 5.5 6.5 6.5L9 18.5" />
+    </Svg>
+  );
+}
+
+/** Repli et déploiement du rail d'outils. */
+export function IconSidebar(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9.5 4v16" />
+    </Svg>
+  );
+}
+
+/** Renommage d'un document. */
+export function IconRename(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M14.5 4.5 19.5 9.5" />
+      <path d="M4 20h4l11-11a2.1 2.1 0 0 0-3-3L5 17Z" />
+    </Svg>
+  );
+}
+
+/** Rédaction assistée : l'échange avec le modèle. */
+export function IconWrite(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M20.5 12a8 8 0 0 1-8 8H4.5l2-3a8 8 0 1 1 14-5Z" />
+      <path d="M8.5 10h8M8.5 14h5" />
+    </Svg>
+  );
+}
+
 /** Information de contexte, sans caractère d'alerte. */
 export function IconInfo(props: IconProps) {
   return (

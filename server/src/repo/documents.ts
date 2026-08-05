@@ -4,6 +4,7 @@ import { db, nowIso, parseJson } from '../db/index.js';
 import { uploadsDir } from '../config.js';
 import type { DocKind, DocumentMeta } from '../domain/types.js';
 import type { SourceDoc } from '../engine/rules.js';
+import { resolveServedType } from '../lib/mime.js';
 
 interface DocumentRow {
   id: number;
@@ -32,6 +33,7 @@ function toDocument(row: DocumentRow): DocumentMeta {
     sha256: row.sha256,
     createdAt: row.created_at,
     parseStatus: row.parse_status as DocumentMeta['parseStatus'],
+    previewable: resolveServedType(row.stored_name).inline,
     parseError: row.parse_error,
     textLength: row.text_content.length,
     metadata: parseJson<Record<string, unknown>>(row.metadata, {}),
@@ -63,13 +65,17 @@ export function getDocumentText(id: number): string | null {
   return row ? row.text_content : null;
 }
 
-export function getDocumentFile(id: number): { path: string; mime: string; filename: string } | null {
+export function getDocumentFile(
+  id: number,
+): { path: string; mime: string; filename: string; storedName: string } | null {
   const row = db.prepare('SELECT * FROM documents WHERE id = ?').get(id) as DocumentRow | undefined;
   if (!row) return null;
   return {
     path: storedPath(row.patient_id, row.stored_name),
     mime: row.mime,
     filename: row.filename,
+    // Porte l'extension du fichier d'origine, que le renommage ne touche pas.
+    storedName: row.stored_name,
   };
 }
 
@@ -119,6 +125,24 @@ export function insertDocument(input: {
       nowIso(),
     );
   return getDocument(Number(info.lastInsertRowid))!;
+}
+
+/**
+ * Renomme un document.
+ *
+ * Seul le nom affiché change. Le fichier reste stocké sous son nom généré, et
+ * l'empreinte comme le texte extrait sont intacts : renommer ne peut donc pas
+ * invalider une extraction ni casser une justification déjà enregistrée.
+ *
+ * Le nom porte du sens dans une étude — « CR opératoire » vaut mieux que
+ * « IMG_2381 » quand on relit trente dossiers.
+ */
+export function renameDocument(id: number, filename: string): DocumentMeta | null {
+  const info = db
+    .prepare('UPDATE documents SET filename = ? WHERE id = ?')
+    .run(filename, id);
+  if (info.changes === 0) return null;
+  return getDocument(id);
 }
 
 export function deleteDocument(id: number): boolean {

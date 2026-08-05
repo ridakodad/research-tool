@@ -16,9 +16,12 @@ import {
   getDocumentText,
   insertDocument,
   listDocuments,
+  renameDocument,
   storedPath,
 } from '../repo/documents.js';
 import { getPatient } from '../repo/patients.js';
+import { documentUpdateSchema } from '../lib/schemas.js';
+import { resolveServedType, safeExtension } from '../lib/mime.js';
 
 export const documentsRouter = Router();
 
@@ -27,53 +30,9 @@ const upload = multer({
   limits: { fileSize: maxUploadBytes, files: 200 },
 });
 
-/** Extension sûre, dérivée du nom d'origine (jamais de chemin). */
-function safeExtension(filename: string): string {
-  const ext = path.extname(path.basename(filename)).toLowerCase();
-  return /^\.[a-z0-9]{1,10}$/.test(ext) ? ext : '';
-}
-
 /** Nom d'affichage : on retire toute composante de chemin envoyée par le client. */
 function displayName(filename: string): string {
   return path.basename(filename.replace(/\\/g, '/')).slice(0, 255) || 'document';
-}
-
-/**
- * Types que le navigateur peut afficher lui-même sans risque.
- *
- * La liste est délibérément fermée. Un document importé est un fichier
- * quelconque : servi en ligne avec un type que le navigateur exécute — SVG et
- * HTML au premier chef — il s'exécuterait dans l'origine de l'application, où
- * se trouvent les données de l'étude. Tout ce qui n'est pas ici part en
- * téléchargement, jamais rendu dans la page.
- */
-const INLINE_TYPES: Record<string, string> = {
-  '.pdf': 'application/pdf',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.bmp': 'image/bmp',
-  '.tif': 'image/tiff',
-  '.tiff': 'image/tiff',
-  '.txt': 'text/plain; charset=utf-8',
-};
-
-/**
- * Type à servir pour un document.
- *
- * Le type déclaré à l'import vient du client et ne vaut rien : un navigateur
- * qui ne reconnaît pas l'extension, ou un import par script, laissent
- * `application/octet-stream`, et le lecteur intégré du navigateur refuse alors
- * d'afficher un PDF pourtant valide. L'extension du nom d'origine est un
- * indice plus fiable, et elle vaut aussi pour les documents déjà en base.
- */
-export function resolveInlineType(
-  filename: string,
-): { mime: string; inline: boolean } {
-  const mime = INLINE_TYPES[safeExtension(filename)];
-  return mime ? { mime, inline: true } : { mime: 'application/octet-stream', inline: false };
 }
 
 interface UploadOutcome {
@@ -195,7 +154,7 @@ documentsRouter.get(
     const file = getDocumentFile(intParam(req, 'id'));
     if (!file) throw notFound('Document introuvable.');
 
-    const { mime, inline } = resolveInlineType(file.filename);
+    const { mime, inline } = resolveServedType(file.storedName);
     res.type(mime);
     // Sans cet en-tête, le navigateur devinerait le type d'après le contenu et
     // contournerait la liste fermée ci-dessus.
@@ -241,6 +200,23 @@ documentsRouter.post(
     );
 
     res.json({ document: getDocument(id) });
+  }),
+);
+
+/**
+ * Renomme un document.
+ *
+ * Un nom parlant vaut mieux qu'un « IMG_2381 » quand on relit trente dossiers.
+ * Seule l'étiquette change : le fichier, son empreinte et son texte extrait
+ * restent en place, donc aucune extraction ni justification n'est invalidée.
+ */
+documentsRouter.patch(
+  '/documents/:id',
+  asyncHandler(async (req, res) => {
+    const { filename } = documentUpdateSchema.parse(req.body);
+    const document = renameDocument(intParam(req, 'id'), displayName(filename));
+    if (!document) throw notFound('Document introuvable.');
+    res.json({ document });
   }),
 );
 
