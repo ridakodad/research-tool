@@ -17,9 +17,22 @@ import type { DocumentMeta, Evidence } from '../lib/types';
 
 type Mode = 'apercu' | 'texte';
 
-/** Formats que le navigateur sait afficher lui-même. */
+/**
+ * Formats que le navigateur sait afficher lui-même.
+ *
+ * Décidé sur l'extension, comme côté serveur : le type déclaré à l'import vient
+ * du client et se révèle souvent inutilisable. Le SVG est volontairement exclu
+ * — le serveur ne le rend jamais en ligne, il s'exécuterait dans l'origine de
+ * l'application.
+ */
+const PREVIEWABLE = /\.(pdf|png|jpe?g|gif|webp|bmp|tiff?)$/i;
+
 function hasNativePreview(doc: DocumentMeta): boolean {
-  return doc.kind === 'image' || doc.kind === 'pdf';
+  return PREVIEWABLE.test(doc.filename);
+}
+
+function isPdf(doc: DocumentMeta): boolean {
+  return /\.pdf$/i.test(doc.filename);
 }
 
 export interface ViewerFocus {
@@ -61,12 +74,20 @@ export function DocumentViewer({
     if (selected && !hasNativePreview(selected)) setMode('texte');
   }, [selected]);
 
-  // Une justification cliquée dans la fiche amène ici, sur le texte extrait.
+  /*
+   * Une justification cliquée dans la fiche amène ici. On montre alors le
+   * document lui-même — c'est le scan ou la photo que le relecteur veut voir,
+   * pas sa transcription. La citation s'affiche au-dessus, et reste
+   * consultable dans le texte extrait d'un clic pour qui veut la position
+   * exacte. Les formats sans aperçu n'ont que leur texte à offrir.
+   */
   useEffect(() => {
     if (!focus) return;
     setSelectedId(focus.documentId);
-    setMode('texte');
-  }, [focus]);
+    const target = documents.find((d) => d.id === focus.documentId);
+    if (target && !hasNativePreview(target)) setMode('texte');
+    else setMode('apercu');
+  }, [focus, documents]);
 
   if (documents.length === 0) {
     return (
@@ -125,6 +146,19 @@ export function DocumentViewer({
           onMode={setMode}
           onEnlarge={() => setEnlarged(true)}
         />
+
+        {/* La citation qui a motivé la valeur, gardée sous les yeux pendant
+            qu'on regarde le document d'où elle vient. */}
+        {focus && focus.documentId === selected.id && (
+          <div className="doc-quote">
+            <span className="doc-quote-text">« {focus.evidence.snippet} »</span>
+            {mode !== 'texte' && (
+              <button className="btn-sm" onClick={() => setMode('texte')}>
+                Situer dans le texte
+              </button>
+            )}
+          </div>
+        )}
 
         <div className="doc-body">
           <ViewerBody doc={selected} mode={mode} focus={focus} />
@@ -214,15 +248,33 @@ function ViewerBody({
   mode: Mode;
   focus: ViewerFocus | null;
 }) {
-  if (mode === 'apercu' && doc.kind === 'image') return <ImagePreview doc={doc} />;
-  if (mode === 'apercu' && doc.kind === 'pdf') {
-    return (
-      <iframe
-        className="doc-frame"
-        src={api.documentFileUrl(doc.id)}
-        title={`Aperçu de ${doc.filename}`}
-      />
-    );
+  if (mode === 'apercu' && hasNativePreview(doc)) {
+    if (isPdf(doc)) {
+      /* `object` plutôt que `iframe` : quand le navigateur ne sait pas rendre
+         le PDF, il affiche le contenu de repli au lieu d'un cadre vide. */
+      return (
+        <object
+          className="doc-frame"
+          data={api.documentFileUrl(doc.id)}
+          type="application/pdf"
+          aria-label={`Aperçu de ${doc.filename}`}
+        >
+          <div style={{ padding: 16 }}>
+            <div className="notice notice-info">
+              <IconAlert size={18} />
+              <div>
+                Ce navigateur n'affiche pas les PDF dans la page.{' '}
+                <a href={api.documentFileUrl(doc.id)} target="_blank" rel="noreferrer">
+                  Ouvrir le fichier dans un onglet
+                </a>
+                , ou consultez le texte extrait.
+              </div>
+            </div>
+          </div>
+        </object>
+      );
+    }
+    return <ImagePreview doc={doc} />;
   }
   return <TextPreview doc={doc} focus={focus} />;
 }

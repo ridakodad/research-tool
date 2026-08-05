@@ -493,6 +493,50 @@ describe('résultats et export', () => {
   });
 });
 
+describe('service du fichier d’origine', () => {
+  let patientId: number;
+
+  before(async () => {
+    const { data } = await api<any>('POST', '/api/patients', { code: 'PAT-FICHIER' });
+    patientId = data.patient.id;
+  });
+
+  test('un PDF est servi avec son type, affichable dans la page', async () => {
+    // Le type déclaré à l'import est délibérément inutilisable : c'est le cas
+    // d'un import par script, et de navigateurs qui ne reconnaissent pas
+    // l'extension. Le lecteur intégré du navigateur refuserait alors
+    // d'afficher un PDF pourtant valide.
+    const up = await uploadFiles(patientId, [
+      { name: 'cr.pdf', buffer: makePdf(['Compte rendu.']), type: 'application/octet-stream' },
+    ]);
+    const id = up.results[0].documentId;
+
+    const res = await fetch(`${baseUrl}/api/documents/${id}/file`);
+    assert.match(res.headers.get('content-type') ?? '', /application\/pdf/);
+    assert.match(res.headers.get('content-disposition') ?? '', /^inline/);
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    await res.arrayBuffer();
+  });
+
+  test('un format exécutable n’est jamais rendu dans la page', async () => {
+    // Un SVG servi en ligne s'exécuterait dans l'origine de l'application,
+    // où se trouvent les données de l'étude : il part en téléchargement.
+    const svg = Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+      'utf8',
+    );
+    const up = await uploadFiles(patientId, [
+      { name: 'piege.svg', buffer: svg, type: 'image/svg+xml' },
+    ]);
+    const id = up.results[0].documentId;
+
+    const res = await fetch(`${baseUrl}/api/documents/${id}/file`);
+    assert.match(res.headers.get('content-type') ?? '', /application\/octet-stream/);
+    assert.match(res.headers.get('content-disposition') ?? '', /^attachment/);
+    await res.arrayBuffer();
+  });
+});
+
 describe('robustesse de l’API', () => {
   test('un identifiant inexistant renvoie 404', async () => {
     const { status } = await api('GET', '/api/patients/999999');

@@ -38,6 +38,44 @@ function displayName(filename: string): string {
   return path.basename(filename.replace(/\\/g, '/')).slice(0, 255) || 'document';
 }
 
+/**
+ * Types que le navigateur peut afficher lui-même sans risque.
+ *
+ * La liste est délibérément fermée. Un document importé est un fichier
+ * quelconque : servi en ligne avec un type que le navigateur exécute — SVG et
+ * HTML au premier chef — il s'exécuterait dans l'origine de l'application, où
+ * se trouvent les données de l'étude. Tout ce qui n'est pas ici part en
+ * téléchargement, jamais rendu dans la page.
+ */
+const INLINE_TYPES: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
+  '.txt': 'text/plain; charset=utf-8',
+};
+
+/**
+ * Type à servir pour un document.
+ *
+ * Le type déclaré à l'import vient du client et ne vaut rien : un navigateur
+ * qui ne reconnaît pas l'extension, ou un import par script, laissent
+ * `application/octet-stream`, et le lecteur intégré du navigateur refuse alors
+ * d'afficher un PDF pourtant valide. L'extension du nom d'origine est un
+ * indice plus fiable, et elle vaut aussi pour les documents déjà en base.
+ */
+export function resolveInlineType(
+  filename: string,
+): { mime: string; inline: boolean } {
+  const mime = INLINE_TYPES[safeExtension(filename)];
+  return mime ? { mime, inline: true } : { mime: 'application/octet-stream', inline: false };
+}
+
 interface UploadOutcome {
   filename: string;
   status: 'imported' | 'duplicate' | 'error';
@@ -156,10 +194,15 @@ documentsRouter.get(
   asyncHandler(async (req, res) => {
     const file = getDocumentFile(intParam(req, 'id'));
     if (!file) throw notFound('Document introuvable.');
-    res.type(file.mime || 'application/octet-stream');
+
+    const { mime, inline } = resolveInlineType(file.filename);
+    res.type(mime);
+    // Sans cet en-tête, le navigateur devinerait le type d'après le contenu et
+    // contournerait la liste fermée ci-dessus.
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader(
       'Content-Disposition',
-      `inline; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
+      `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.filename)}`,
     );
     res.sendFile(file.path, (err) => {
       if (err && !res.headersSent) res.status(404).json({ error: 'Fichier absent du disque.' });

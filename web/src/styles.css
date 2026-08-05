@@ -604,6 +604,29 @@ a:hover { color: var(--brand-strong); }
   flex: none;
 }
 
+/* Citation à l'appui de la valeur relue, au-dessus du document. */
+.doc-quote {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s2) var(--s3);
+  background: var(--brand-soft);
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  font-size: 0.8rem;
+  flex: none;
+}
+.doc-quote-text {
+  flex: 1; min-width: 0;
+  font-style: italic;
+  color: var(--text-primary);
+  /* Deux lignes au plus : le bandeau ne doit pas manger la place du
+     document qu'il commente. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.doc-quote button { flex: none; }
+
 .doc-body {
   flex: 1;
   min-height: 260px;
