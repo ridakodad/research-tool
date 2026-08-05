@@ -301,9 +301,16 @@ web/public/logo-hopital.jpg
 ```
 
 Reconstruisez ensuite (`npm run build`) pour que le fichier soit repris dans
-`web/dist`. Il apparaît en haut à gauche, hauteur imposée à 34 px et largeur
-libre jusqu'à 200 px : le bloc-marque complet comme le symbole seul passent
-sans déformation — à cette hauteur, le symbole seul reste le plus lisible.
+`web/dist`. Il apparaît en haut à gauche, hauteur imposée à 36 px et largeur
+libre jusqu'à 200 px, posé sur un support blanc arrondi — un logo
+institutionnel est dessiné pour le papier, ses couleurs deviennent illisibles
+sur fond sombre sans ce support.
+
+**Fournissez de préférence le symbole seul, pas le bloc-marque complet.** À
+36 px de haut, le nom de l'établissement sur plusieurs lignes se réduit à
+quelques pixels par lettre et ne se lit pas ; le symbole seul reste
+reconnaissable. Le nom est de toute façon écrit en toutes lettres sur le plan
+de travail.
 
 Tant que le fichier est absent, un monogramme neutre aux couleurs de la charte
 prend sa place. Ce n'est volontairement pas une imitation du logo : une

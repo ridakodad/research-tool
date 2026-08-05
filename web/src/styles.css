@@ -259,9 +259,27 @@ a:hover { color: var(--brand-strong); }
 /* --- identité ------------------------------------------------------------ */
 
 .brand { display: flex; align-items: center; gap: var(--s3); min-width: 0; }
-/* Hauteur imposée, largeur libre : accepte aussi bien le bloc-marque complet
-   (logo + texte) que le symbole seul, sans déformer ni l'un ni l'autre. */
-.brand-logo { height: 34px; width: auto; max-width: 200px; object-fit: contain; display: block; }
+/*
+ * Hauteur imposée, largeur libre : accepte aussi bien le bloc-marque complet
+ * (logo + texte) que le symbole seul, sans déformer ni l'un ni l'autre.
+ *
+ * Support blanc assumé. Un logo institutionnel est dessiné pour le papier :
+ * ses verts et ses rouges deviennent illisibles sur fond sombre, et un export
+ * au fond opaque apparaîtrait alors comme un rectangle blanc accidentel. Le
+ * support lui donne la même assise dans les deux thèmes — arrondi et ombre
+ * repris du reste du châssis, pour qu'il se lise comme un choix.
+ */
+.brand-logo {
+  height: 36px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+  display: block;
+  background: #fff;
+  padding: 3px 7px;
+  border-radius: 7px;
+  box-shadow: var(--shadow-1);
+}
 .brand-text { display: flex; flex-direction: column; min-width: 0; }
 .brand-title {
   font-size: 0.9rem; font-weight: 650; line-height: 1.2;

@@ -22,10 +22,17 @@ Reconstruisez ensuite pour que le fichier soit repris dans `web/dist` :
 npm run build
 ```
 
-Le logo s'affiche en haut à gauche, hauteur imposée à 34 px et largeur libre
-(jusqu'à 200 px). Le bloc-marque complet — symbole et texte — comme le symbole
-seul passent donc sans déformation ; à cette hauteur, le symbole seul reste le
-plus lisible.
+Le logo s'affiche en haut à gauche, hauteur imposée à 36 px et largeur libre
+(jusqu'à 200 px), posé sur un support blanc arrondi. Ce support n'est pas un
+détail : un logo institutionnel est dessiné pour le papier, ses couleurs
+deviennent illisibles sur fond sombre. Il lui donne la même assise dans les
+deux thèmes.
+
+**Préférez le symbole seul au bloc-marque complet.** À 36 px de haut, le texte
+d'un bloc-marque — nom de l'établissement sur plusieurs lignes — se réduit à
+quelques pixels par lettre et ne se lit pas. Le symbole seul, lui, reste
+reconnaissable. Le nom de l'établissement est de toute façon écrit en toutes
+lettres sur le plan de travail.
 
 Tant qu'aucun de ces fichiers n'est présent, un monogramme neutre aux couleurs
 de la charte prend sa place. C'est délibérément une marque neutre et non une
