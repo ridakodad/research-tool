@@ -289,16 +289,21 @@ L'extraction n'est qu'un outil parmi eux.
 
 ### Déposer le logo de l'établissement
 
-Le logo officiel n'est pas versionné dans le dépôt. Déposez-le ici :
+Le logo officiel n'est pas versionné dans le dépôt : c'est une marque déposée
+de l'établissement, pas un élément du code. Déposez-le dans `web/public/` sous
+l'un de ces noms — l'application essaie les trois dans cet ordre, sans aucune
+modification de code :
 
 ```
+web/public/logo-hopital.svg     ← préféré (net à toutes les tailles)
 web/public/logo-hopital.png
+web/public/logo-hopital.jpg
 ```
 
-puis reconstruisez (`npm run build`). Il apparaît en haut à gauche, hauteur
-imposée à 34 px et largeur libre : le bloc-marque complet comme le symbole seul
-passent sans déformation. Formats acceptés : PNG ou SVG (adaptez alors
-l'extension dans `web/src/components/Brand.tsx`).
+Reconstruisez ensuite (`npm run build`) pour que le fichier soit repris dans
+`web/dist`. Il apparaît en haut à gauche, hauteur imposée à 34 px et largeur
+libre jusqu'à 200 px : le bloc-marque complet comme le symbole seul passent
+sans déformation — à cette hauteur, le symbole seul reste le plus lisible.
 
 Tant que le fichier est absent, un monogramme neutre aux couleurs de la charte
 prend sa place. Ce n'est volontairement pas une imitation du logo : une
