@@ -161,7 +161,7 @@ export function WorkspacePage() {
             unit={templateName ? `variables · ${templateName}` : 'variables'}
           />
           <ToolCard
-            to="/dossiers#extraction"
+            to="/extraction"
             icon={IconExtract}
             tone="lime"
             title="Extraction"

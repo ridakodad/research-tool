@@ -1161,3 +1161,18 @@ details.section[open] > summary::before { transform: rotate(90deg); }
   border-radius: var(--radius);
 }
 .export-choice > .row { margin-left: auto; }
+
+/* Rendement d'un fichier : ce qu'il a permis de renseigner. */
+.doc-yield {
+  padding: var(--s3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--brand);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+/* Un fichier sans apport se distingue par sa teinte autant que par son texte :
+   c'est lui qu'on cherche en ouvrant cette page. */
+.doc-yield-barren {
+  border-left-color: var(--warning);
+  background: var(--surface-2);
+}

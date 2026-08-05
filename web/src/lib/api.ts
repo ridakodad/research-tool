@@ -4,6 +4,7 @@ import type {
   CompletenessField,
   DatasetRow,
   DocumentMeta,
+  ExtractionOverview,
   ExtractionRunResult,
   FieldStats,
   Patient,
@@ -166,6 +167,10 @@ export const api = {
   stats: (templateId?: number) =>
     get<{ template: TemplateWithFields; patientCount: number; stats: FieldStats[] }>(
       `/analytics/stats${templateId ? `?templateId=${templateId}` : ''}`,
+    ),
+  extractionOverview: (templateId?: number) =>
+    get<ExtractionOverview>(
+      `/analytics/extraction${templateId ? `?templateId=${templateId}` : ''}`,
     ),
   completeness: (templateId?: number) =>
     get<{ patientCount: number; fields: CompletenessField[] }>(

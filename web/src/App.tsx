@@ -17,6 +17,7 @@ import { WorkspaceProvider, useWorkspace } from './lib/workspace';
 import { DossiersPage } from './pages/DossiersPage';
 import { DossierDetailPage } from './pages/DossierDetailPage';
 import { FichePage } from './pages/FichePage';
+import { ExtractionPage } from './pages/ExtractionPage';
 import { ResultatsPage } from './pages/ResultatsPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 
@@ -67,7 +68,7 @@ function ToolRail({ collapsed }: { collapsed: boolean }) {
           count: loading ? null : fields,
           matchPrefix: '/fiche',
         },
-        { to: '/dossiers#extraction', label: 'Extraction', icon: IconExtract },
+        { to: '/extraction', label: 'Extraction', icon: IconExtract, matchPrefix: '/extraction' },
       ],
     },
     {
@@ -211,6 +212,7 @@ export function App() {
                 <Route path="/dossiers" element={<DossiersPage />} />
                 <Route path="/dossiers/:id" element={<DossierDetailPage />} />
                 <Route path="/fiche" element={<FichePage />} />
+                <Route path="/extraction" element={<ExtractionPage />} />
                 <Route path="/resultats" element={<ResultatsPage />} />
                 <Route path="/index.html" element={<Navigate to="/" replace />} />
                 <Route

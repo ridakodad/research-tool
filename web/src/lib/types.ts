@@ -271,3 +271,40 @@ export interface Capabilities {
   llm: { available: boolean; model: string; effort: string; reason: string | null };
   maxUploadBytes: number;
 }
+
+/* ----------------------------------------------- rendement de l'extraction */
+
+/** Un fichier du dossier, et les variables qu'il a permis de renseigner. */
+export interface ExtractionDocument {
+  documentId: number;
+  filename: string;
+  kind: DocKind;
+  parseStatus: 'pending' | 'ok' | 'error' | 'empty';
+  textLength: number;
+  /** Libellés des variables justifiées par ce document. Vide = n'a rien produit. */
+  fields: string[];
+}
+
+export interface ExtractionRow {
+  patientId: number;
+  patientCode: string;
+  patientLabel: string | null;
+  lastExtractionAt: string | null;
+  filled: number;
+  total: number;
+  bySource: { auto: number; llm: number; manual: number };
+  /** Valeurs renseignées sans document justificatif : saisies à la main. */
+  sansJustification: number;
+  documents: ExtractionDocument[];
+}
+
+export interface ExtractionOverview {
+  template: TemplateWithFields;
+  rows: ExtractionRow[];
+  summary: {
+    patients: number;
+    emptyPatients: number;
+    barrenDocuments: number;
+    documents: number;
+  };
+}

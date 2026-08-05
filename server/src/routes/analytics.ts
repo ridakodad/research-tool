@@ -3,6 +3,7 @@ import { asyncHandler, intQuery, notFound } from '../lib/http.js';
 import { getActiveTemplate, getTemplate } from '../repo/templates.js';
 import { listPatients } from '../repo/patients.js';
 import { listRecordsForTemplate } from '../repo/records.js';
+import { listDocuments } from '../repo/documents.js';
 import { countCategories, histogram, summarize } from '../lib/stats.js';
 import type {
   FieldValue,
@@ -263,6 +264,99 @@ analyticsRouter.get(
     });
 
     res.json({ template, patientCount: rows.length, stats });
+  }),
+);
+
+/**
+ * Rendement de l'extraction, dossier par dossier et fichier par fichier.
+ *
+ * Le taux de complétude dit *combien* manque, pas *pourquoi*. Cette vue
+ * répond à la seconde question : elle attribue chaque valeur au document qui
+ * l'a justifiée, et met en regard les fichiers qui n'ont rien produit. Un
+ * document sans texte exploitable, un compte rendu dont aucune règle
+ * n'accroche le vocabulaire, un dossier resté vide — le paramétrage se corrige
+ * à partir de là, pas à partir d'un pourcentage global.
+ */
+analyticsRouter.get(
+  '/extraction',
+  asyncHandler(async (req, res) => {
+    const template = resolveTemplate(intQuery(req, 'templateId'));
+    const patients = listPatients();
+    const records = new Map(
+      listRecordsForTemplate(template.id).map((record) => [record.patientId, record]),
+    );
+    const fieldById = new Map(template.fields.map((f) => [f.id, f]));
+
+    const rows = patients.map((patient) => {
+      const record = records.get(patient.id);
+      const documents = listDocuments(patient.id);
+
+      const perDocument = new Map<number, { name: string; values: string[] }>();
+      const bySource = { auto: 0, llm: 0, manual: 0 };
+      /** Valeurs sans justification : saisies à la main, ou justification perdue. */
+      let sansJustification = 0;
+      let filled = 0;
+
+      for (const value of record?.values ?? []) {
+        const field = fieldById.get(value.fieldId);
+        if (!field || isEmpty(value.value)) continue;
+        filled++;
+        if (value.source === 'manual') bySource.manual++;
+        else if (value.source === 'llm') bySource.llm++;
+        else bySource.auto++;
+
+        if (!value.evidence) {
+          sansJustification++;
+          continue;
+        }
+        const entry = perDocument.get(value.evidence.documentId) ?? {
+          name: value.evidence.documentName,
+          values: [],
+        };
+        entry.values.push(field.label);
+        perDocument.set(value.evidence.documentId, entry);
+      }
+
+      return {
+        patientId: patient.id,
+        patientCode: patient.code,
+        patientLabel: patient.label,
+        lastExtractionAt: record?.lastExtractionAt ?? null,
+        filled,
+        total: template.fields.length,
+        bySource,
+        sansJustification,
+        documents: documents.map((doc) => {
+          const found = perDocument.get(doc.id);
+          return {
+            documentId: doc.id,
+            filename: doc.filename,
+            kind: doc.kind,
+            parseStatus: doc.parseStatus,
+            textLength: doc.textLength,
+            // Les libellés plutôt qu'un simple compte : on veut savoir quelles
+            // variables viennent de quel document.
+            fields: found?.values ?? [],
+          };
+        }),
+      };
+    });
+
+    res.json({
+      template,
+      rows,
+      summary: {
+        patients: rows.length,
+        /** Dossiers dont aucune variable n'a pu être renseignée. */
+        emptyPatients: rows.filter((r) => r.filled === 0).length,
+        /** Fichiers importés qui n'ont justifié aucune valeur. */
+        barrenDocuments: rows.reduce(
+          (sum, r) => sum + r.documents.filter((d) => d.fields.length === 0).length,
+          0,
+        ),
+        documents: rows.reduce((sum, r) => sum + r.documents.length, 0),
+      },
+    });
   }),
 );
 
