@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../lib/api';
-import { displayValue, slugifyKey } from '../lib/format';
+import { displayValue, plural, slugifyKey } from '../lib/format';
 import { FIELD_TYPE_LABELS } from '../lib/types';
 import type {
   ExtractionRule,
@@ -276,9 +276,25 @@ export function FieldEditor({
         )}
 
         {/* ---------------------------------------------- extraction */}
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+        {/* Repliée à la création : définir une variable et écrire ses règles
+            sont deux gestes distincts, et le formulaire entier ne tient pas
+            sur un écran d'ordinateur portable. Ouverte d'emblée quand des
+            règles existent déjà, puisqu'on vient alors les modifier. */}
+        <details className="section" open={draft.extraction.rules.length > 0}>
+          <summary>
+            Extraction automatique
+            <span className="spacer" />
+            <span className="small muted">
+              {!draft.extraction.enabled
+                ? 'désactivée'
+                : draft.extraction.rules.length === 0
+                  ? 'aucune règle'
+                  : plural(draft.extraction.rules.length, 'règle')}
+            </span>
+          </summary>
+
+          <div style={{ paddingTop: 14 }}>
           <div className="row" style={{ marginBottom: 10 }}>
-            <h3 style={{ fontSize: '0.95rem' }}>Extraction automatique</h3>
             <div className="spacer" />
             <label className="checkbox">
               <input
@@ -349,7 +365,8 @@ export function FieldEditor({
               <RuleTestBench draft={draft} patients={patients} />
             </div>
           )}
-        </div>
+          </div>
+        </details>
       </div>
     </Modal>
   );

@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { IconAlert, IconAuto, IconClose, IconMoon, IconSun } from './icons';
 
 // ------------------------------------------------------------------- toasts
@@ -104,7 +105,16 @@ export function Modal({
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, []);
 
-  return (
+  /*
+   * Rendue directement sous `body`, hors de l'arbre de la page.
+   *
+   * Une fenêtre modale se positionne par rapport à l'écran. Il suffit qu'un
+   * ancêtre porte un `transform`, un `filter` ou un `backdrop-filter` — même
+   * neutre — pour qu'il devienne le référentiel du positionnement fixe : la
+   * fenêtre se centre alors dans la page et déborde de l'écran. Le portail
+   * rend l'affichage indépendant de ce que la page fait de ses styles.
+   */
+  return createPortal(
     <div
       className="modal-backdrop"
       onMouseDown={(e) => {
@@ -128,7 +138,8 @@ export function Modal({
         <div className="modal-body" ref={bodyRef}>{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
