@@ -534,6 +534,163 @@ a:hover { color: var(--brand-strong); }
   font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted);
 }
 
+/* ====================================== relecture : fiche + document ======= */
+
+/*
+ * Deux colonnes qui ne défilent pas ensemble. La fiche est longue, le lecteur
+ * reste en place : c'est ce qui permet de renseigner une variable en gardant
+ * le document sous les yeux.
+ */
+.relecture {
+  display: grid;
+  gap: var(--s4);
+  /* Le lecteur doit rester assez large pour qu'une photo de compte rendu soit
+     lisible sans l'agrandir à chaque fois. */
+  grid-template-columns: minmax(0, 1.25fr) minmax(400px, 1fr);
+  align-items: start;
+}
+
+.doc-panel {
+  position: sticky;
+  top: calc(var(--topbar-height) + var(--s4));
+  max-height: calc(100vh - var(--topbar-height) - var(--s5) * 2);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* --- sélection du document ----------------------------------------------- */
+
+.doc-tabs {
+  display: flex;
+  gap: var(--s1);
+  padding: var(--s2) var(--s3) 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.doc-tab {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  padding: var(--s2) var(--s3);
+  max-width: 190px;
+  white-space: nowrap;
+}
+.doc-tab:hover:not(:disabled) { background: var(--surface-2); box-shadow: none; }
+.doc-tab.active {
+  color: var(--brand-strong);
+  border-bottom-color: var(--brand);
+  font-weight: 600;
+}
+/* Pastille discrète sur un document dont le texte n'a pas pu être lu : la
+   couleur ne porte rien seule, le titre de survol nomme la cause. */
+.doc-tab-flag {
+  display: inline-block;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--warning);
+  margin-left: var(--s2);
+  vertical-align: 1px;
+}
+
+.doc-toolbar {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+
+.doc-body {
+  flex: 1;
+  min-height: 260px;
+  overflow: auto;
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-foot {
+  display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
+  padding: var(--s2) var(--s3);
+  border-top: 1px solid var(--border);
+  flex: none;
+}
+
+/* --- aperçus -------------------------------------------------------------- */
+
+.doc-frame { flex: 1; width: 100%; border: none; min-height: 420px; background: #fff; }
+
+.doc-image-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.doc-zoom {
+  display: flex; align-items: center; gap: var(--s1);
+  padding: var(--s2) var(--s3);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+/* Fond blanc sous l'image : un scan de compte rendu est sur papier, un fond
+   sombre fausserait la lecture des gris. */
+.doc-image-scroll {
+  flex: 1; overflow: auto; padding: var(--s3);
+  background: #fff;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.doc-image-scroll img { display: block; height: auto; flex: none; }
+
+.doc-text {
+  margin: 0;
+  padding: var(--s4);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  font-family: var(--mono);
+  color: var(--text-primary);
+}
+/* La citation retrouvée, mise en évidence. Le fond seul ne suffirait pas en
+   thème sombre : le liseré latéral la marque aussi. */
+.doc-mark {
+  background: var(--brand-soft);
+  color: var(--text-primary);
+  border-left: 3px solid var(--brand);
+  padding: 1px 3px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand) 35%, transparent);
+}
+
+.doc-enlarged {
+  height: min(76vh, 900px);
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.doc-enlarged > * { flex: 1; min-height: 0; }
+
+/* Lien présenté comme du texte, dans un paragraphe. */
+.link-button {
+  border: none; background: none; padding: 0;
+  font: inherit; font-size: inherit;
+  color: var(--brand);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.link-button:hover { background: none; box-shadow: none; color: var(--brand-strong); }
+
+@media (max-width: 1100px) {
+  /* Trop étroit pour deux colonnes utiles : le lecteur repasse sous la fiche
+     et cesse d'être collant, sinon il masquerait ce qu'on est en train de
+     saisir. */
+  .relecture { grid-template-columns: minmax(0, 1fr); }
+  .doc-panel { position: static; max-height: none; }
+  .doc-body { max-height: 70vh; }
+}
+
 /* ============================================================ contrôles ==== */
 
 button, .btn {
@@ -677,9 +834,15 @@ tbody tr:hover .table-sticky-col { background: var(--surface-2); }
 .notice-info { border-left-color: var(--brand); }
 .notice > .icon { flex: none; margin-top: 1px; }
 
-/* Les liens du rail visent des ancres situées sous une barre collante : sans
-   cette marge, la cible arriverait masquée par le châssis. */
-[id] { scroll-margin-top: calc(var(--topbar-height) + var(--s4)); }
+/*
+ * Les liens du rail visent des ancres situées sous une barre collante : sans
+ * cette marge, la cible arriverait masquée par le châssis.
+ *
+ * Réservé aux ancres réelles. Appliquée à tout élément porteur d'un id, cette
+ * marge s'invite dans les zones défilantes — un champ qui prend le focus dans
+ * une fenêtre modale la fait défiler de 76 px, masquant les champs du dessus.
+ */
+.anchor-target { scroll-margin-top: calc(var(--topbar-height) + var(--s4)); }
 
 .dropzone {
   border: 2px dashed var(--border-strong);

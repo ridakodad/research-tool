@@ -171,7 +171,7 @@ export function DossiersPage() {
 
       {patients.length > 0 && (
         /* Cible du raccourci « Extraction » du rail d'outils. */
-        <div className="card" id="extraction">
+        <div className="card anchor-target" id="extraction">
           <div className="card-head">
             <h2>Extraction automatique</h2>
             <span className="sub">

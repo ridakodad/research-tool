@@ -81,6 +81,8 @@ export function Modal({
   footer?: ReactNode;
   width?: number;
 }) {
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -94,6 +96,13 @@ export function Modal({
       document.body.style.overflow = previous;
     };
   }, [onClose]);
+
+  // Une fenêtre s'ouvre toujours à son premier champ. Le navigateur peut
+  // l'avoir fait défiler en amenant le champ initial dans la vue : cet effet
+  // s'exécute après, et rétablit le haut.
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, []);
 
   return (
     <div
@@ -116,7 +125,7 @@ export function Modal({
             <IconClose size={18} />
           </button>
         </div>
-        <div className="modal-body">{children}</div>
+        <div className="modal-body" ref={bodyRef}>{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
       </div>
     </div>

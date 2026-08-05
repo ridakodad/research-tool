@@ -156,6 +156,17 @@ export function IconAlert(props: IconProps) {
   );
 }
 
+/** Information de contexte, sans caractère d'alerte. */
+export function IconInfo(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5.5" />
+      <path d="M12 7.8h.01" />
+    </Svg>
+  );
+}
+
 /** Résultat trouvé au banc d'essai. */
 export function IconCheck(props: IconProps) {
   return (
