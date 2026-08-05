@@ -490,6 +490,23 @@ function ExportPanel({ templateId }: { templateId: number }) {
         </div>
       </div>
 
+      <div className="export-choice">
+        <div>
+          <h3 style={{ marginBottom: 4 }}>Figures en diaporama</h3>
+          <p className="small secondary" style={{ maxWidth: '58ch' }}>
+            Une planche par variable décrite, dessinée en formes natives — nette
+            à toute échelle et modifiable sous PowerPoint, sans passer par une
+            capture d'écran. Chaque planche porte son numéro de figure et sa
+            page, de quoi la citer dans le texte d'un article.
+          </p>
+        </div>
+        <div className="row" style={{ gap: 8 }}>
+          <a className="btn" href={api.pptxUrl(templateId)}>
+            Télécharger les figures
+          </a>
+        </div>
+      </div>
+
       <h3 style={{ marginTop: 8 }}>Formats texte</h3>
       <p className="small secondary" style={{ maxWidth: '72ch' }}>
         Pour R, Python ou SPSS. Réglez la mise en forme selon le logiciel qui

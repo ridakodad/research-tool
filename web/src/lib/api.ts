@@ -183,6 +183,7 @@ export const api = {
     `&booleans=${opts.booleans}&labels=${opts.labels ? '1' : '0'}`,
   xlsxUrl: (templateId: number, labels: boolean) =>
     `/api/export/xlsx?templateId=${templateId}&labels=${labels ? '1' : '0'}`,
+  pptxUrl: (templateId: number) => `/api/export/pptx?templateId=${templateId}`,
   dictionaryUrl: (templateId: number, delimiter: string) =>
     `/api/export/dictionary.csv?templateId=${templateId}&delimiter=${encodeURIComponent(delimiter)}`,
   templateJsonUrl: (templateId: number) => `/api/export/template.json?templateId=${templateId}`,

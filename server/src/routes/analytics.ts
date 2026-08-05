@@ -179,91 +179,102 @@ export type FieldStats =
  * quantitatif, effectifs par catégorie pour le qualitatif, regroupement par
  * année pour les dates.
  */
+/**
+ * Statistiques descriptives, variable par variable.
+ *
+ * Extrait de la route qui les servait : l'export en diaporama a besoin des
+ * mêmes calculs, et deux implémentations divergeraient tôt ou tard — une
+ * figure ne doit pas contredire le tableau dont elle est tirée.
+ */
+export function buildFieldStats(
+  template: TemplateWithFields,
+  rows: DatasetRow[],
+): FieldStats[] {
+  return template.fields.map((field) => {
+    const raw = rows.map((r) => r.values[field.key] ?? null);
+    const present = raw.filter((v) => !isEmpty(v));
+    const base = {
+      key: field.key,
+      label: field.label,
+      type: field.type,
+      unit: field.unit,
+      section: field.section,
+      n: present.length,
+      missing: rows.length - present.length,
+    };
+
+    switch (field.type) {
+      case 'number':
+      case 'integer': {
+        const numbers = present
+          .map((v) => (typeof v === 'number' ? v : Number(v)))
+          .filter((v) => Number.isFinite(v));
+        return {
+          ...base,
+          n: numbers.length,
+          missing: rows.length - numbers.length,
+          chart: 'histogram',
+          summary: summarize(numbers),
+          bins: histogram(numbers),
+        };
+      }
+
+      case 'boolean': {
+        const labels = present.map((v) => (v === true ? 'Oui' : 'Non'));
+        return { ...base, chart: 'categories', categories: countCategories(labels) };
+      }
+
+      case 'enum': {
+        return {
+          ...base,
+          chart: 'categories',
+          categories: countCategories(present.map((v) => String(v))),
+        };
+      }
+
+      case 'multi': {
+        // Une observation peut cocher plusieurs options : les effectifs
+        // portent sur les citations, le total peut dépasser l'effectif.
+        const flat = present.flatMap((v) => (Array.isArray(v) ? v : [String(v)]));
+        return { ...base, chart: 'categories', categories: countCategories(flat) };
+      }
+
+      case 'date': {
+        const dates = present
+          .map((v) => String(v))
+          .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+        // Un seul bâton « 2024 » n'apprend rien : on descend au mois tant que
+        // le nombre de classes reste lisible, et on remonte à l'année sinon.
+        const months = new Set(dates.map((d) => d.slice(0, 7)));
+        const buckets =
+          months.size <= 24
+            ? dates.map((d) => formatMonth(d.slice(0, 7)))
+            : dates.map((d) => d.slice(0, 4));
+        return {
+          ...base,
+          n: dates.length,
+          missing: rows.length - dates.length,
+          chart: 'categories',
+          // Ordre chronologique : une distribution temporelle ne se trie pas
+          // par effectif.
+          categories: sortChronologically(countCategories(buckets)),
+        };
+      }
+
+    default: {
+      const values = present.map((v) => String(v));
+      return { ...base, chart: 'none', topValues: countCategories(values).slice(0, 10) };
+    }
+  }
+  });
+}
+
 analyticsRouter.get(
   '/stats',
   asyncHandler(async (req, res) => {
     const template = resolveTemplate(intQuery(req, 'templateId'));
     const rows = buildDataset(template);
-
-    const stats: FieldStats[] = template.fields.map((field) => {
-      const raw = rows.map((r) => r.values[field.key] ?? null);
-      const present = raw.filter((v) => !isEmpty(v));
-      const base = {
-        key: field.key,
-        label: field.label,
-        type: field.type,
-        unit: field.unit,
-        section: field.section,
-        n: present.length,
-        missing: rows.length - present.length,
-      };
-
-      switch (field.type) {
-        case 'number':
-        case 'integer': {
-          const numbers = present
-            .map((v) => (typeof v === 'number' ? v : Number(v)))
-            .filter((v) => Number.isFinite(v));
-          return {
-            ...base,
-            n: numbers.length,
-            missing: rows.length - numbers.length,
-            chart: 'histogram',
-            summary: summarize(numbers),
-            bins: histogram(numbers),
-          };
-        }
-
-        case 'boolean': {
-          const labels = present.map((v) => (v === true ? 'Oui' : 'Non'));
-          return { ...base, chart: 'categories', categories: countCategories(labels) };
-        }
-
-        case 'enum': {
-          return {
-            ...base,
-            chart: 'categories',
-            categories: countCategories(present.map((v) => String(v))),
-          };
-        }
-
-        case 'multi': {
-          // Une observation peut cocher plusieurs options : les effectifs
-          // portent sur les citations, le total peut dépasser l'effectif.
-          const flat = present.flatMap((v) => (Array.isArray(v) ? v : [String(v)]));
-          return { ...base, chart: 'categories', categories: countCategories(flat) };
-        }
-
-        case 'date': {
-          const dates = present
-            .map((v) => String(v))
-            .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
-          // Un seul bâton « 2024 » n'apprend rien : on descend au mois tant que
-          // le nombre de classes reste lisible, et on remonte à l'année sinon.
-          const months = new Set(dates.map((d) => d.slice(0, 7)));
-          const buckets =
-            months.size <= 24
-              ? dates.map((d) => formatMonth(d.slice(0, 7)))
-              : dates.map((d) => d.slice(0, 4));
-          return {
-            ...base,
-            n: dates.length,
-            missing: rows.length - dates.length,
-            chart: 'categories',
-            // Ordre chronologique : une distribution temporelle ne se trie pas
-            // par effectif.
-            categories: sortChronologically(countCategories(buckets)),
-          };
-        }
-
-        default: {
-          const values = present.map((v) => String(v));
-          return { ...base, chart: 'none', topValues: countCategories(values).slice(0, 10) };
-        }
-      }
-    });
-
-    res.json({ template, patientCount: rows.length, stats });
+    res.json({ template, patientCount: rows.length, stats: buildFieldStats(template, rows) });
   }),
 );
 

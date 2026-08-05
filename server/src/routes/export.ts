@@ -3,8 +3,9 @@ import { asyncHandler, intQuery, notFound } from '../lib/http.js';
 import { getActiveTemplate, getTemplate } from '../repo/templates.js';
 import { toCsv } from '../lib/csv.js';
 import { makeXlsx, type CellValue, type Sheet } from '../lib/xlsx.js';
+import { makePptx, type ChartSlide } from '../lib/pptx.js';
 import { summarize } from '../lib/stats.js';
-import { buildDataset } from './analytics.js';
+import { buildDataset, buildFieldStats } from './analytics.js';
 import type { FieldValue, TemplateWithFields } from '../domain/types.js';
 
 export const exportRouter = Router();
@@ -270,3 +271,76 @@ exportRouter.get(
     res.send(file);
   }),
 );
+
+/**
+ * Export des distributions en diaporama.
+ *
+ * Une distribution finit presque toujours dans un diaporama : réunion de
+ * service, comité de thèse, congrès. La refaire à la main à partir d'une
+ * capture fait perdre la netteté et introduit des erreurs de recopie. Chaque
+ * graphique est ici dessiné en formes natives, donc net à toute échelle et
+ * modifiable, et chaque planche porte son numéro de figure et sa page — ce qui
+ * la rend citable dans le texte d'un article.
+ *
+ * Seules les variables ayant produit des effectifs sont retenues : une planche
+ * vide n'apprend rien et alourdit la présentation.
+ */
+exportRouter.get(
+  '/pptx',
+  asyncHandler(async (req, res) => {
+    const template = resolveTemplate(intQuery(req, 'templateId'));
+    const rows = buildDataset(template);
+    const stats = buildFieldStats(template, rows);
+
+    const slides: ChartSlide[] = [];
+    for (const stat of stats) {
+      const manquants = stat.missing > 0 ? `, ${stat.missing} manquantes` : '';
+      const subtitle = `${stat.n} observations${manquants} · ${stat.section}`;
+
+      if (stat.chart === 'categories' && stat.categories.length > 0) {
+        slides.push({
+          title: stat.label + (stat.unit ? ` (${stat.unit})` : ''),
+          subtitle,
+          bars: stat.categories.map((c) => ({ label: c.label, value: c.count })),
+        });
+      } else if (stat.chart === 'histogram' && stat.bins.length > 0 && stat.n > 0) {
+        const s = stat.summary;
+        slides.push({
+          title: stat.label + (stat.unit ? ` (${stat.unit})` : ''),
+          subtitle,
+          bars: stat.bins.map((b) => ({
+            label: `${formatBound(b.from)} – ${formatBound(b.to)}`,
+            value: b.count,
+          })),
+          note: s
+            ? `Moyenne ${formatBound(s.mean)} ± ${formatBound(s.sd)} · médiane ${formatBound(s.median)} · extrêmes ${formatBound(s.min)} – ${formatBound(s.max)}`
+            : undefined,
+        });
+      }
+    }
+
+    const file = makePptx({
+      title: template.name,
+      subtitle:
+        `${rows.length} dossiers · ${slides.length} figures · ` +
+        `exporté depuis l'espace de recherche`,
+      slides,
+    });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${slugify(template.name)}-figures.pptx"`,
+    );
+    res.send(file);
+  }),
+);
+
+/** Deux décimales au plus : au-delà, la précision est illusoire. */
+function formatBound(value: number): string {
+  if (!Number.isFinite(value)) return '—';
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');
+}

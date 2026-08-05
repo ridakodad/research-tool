@@ -617,6 +617,42 @@ describe('export au format classeur', () => {
     const nue = /&(?!(amp|lt|gt|quot|apos|#\d+);)/.exec(feuille1);
     assert.equal(nue, null, `esperluette non échappée : ${nue?.input.slice(nue.index, nue.index + 40)}`);
   });
+
+  test('le diaporama produit est une archive lisible et numérotée', async () => {
+    const res = await fetch(`${baseUrl}/api/export/pptx`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /presentationml\.presentation/);
+
+    const files = readZip(Buffer.from(await res.arrayBuffer()));
+    for (const required of [
+      '[Content_Types].xml',
+      'ppt/presentation.xml',
+      'ppt/theme/theme1.xml',
+      'ppt/slideMasters/slideMaster1.xml',
+      'ppt/slideLayouts/slideLayout1.xml',
+      'ppt/slides/slide1.xml',
+    ]) {
+      assert.ok(files.has(required), `partie manquante : ${required}`);
+    }
+
+    // Chaque planche déclarée dans la présentation doit exister et être reliée
+    // à une disposition : c'est ce qui manque le plus souvent dans un .pptx
+    // écrit à la main, et PowerPoint refuse alors le fichier entier.
+    const presentation = files.get('ppt/presentation.xml')!.toString('utf8');
+    const declarees = [...presentation.matchAll(/r:id="rIdSlide(\d+)"/g)].map((m) => m[1]);
+    assert.ok(declarees.length > 1, 'la couverture et au moins une figure');
+    for (const n of declarees) {
+      assert.ok(files.has(`ppt/slides/slide${n}.xml`), `planche ${n} absente`);
+      assert.ok(files.has(`ppt/slides/_rels/slide${n}.xml.rels`), `relations ${n} absentes`);
+    }
+
+    // Une figure porte son numéro : c'est ce qui la rend citable dans un texte.
+    const figure = files.get('ppt/slides/slide2.xml')!.toString('utf8');
+    assert.match(figure, /Figure 1/);
+
+    const nue = /&(?!(amp|lt|gt|quot|apos|#\d+);)/.exec(figure);
+    assert.equal(nue, null, 'esperluette non échappée dans une planche');
+  });
 });
 
 describe('robustesse de l’API', () => {
