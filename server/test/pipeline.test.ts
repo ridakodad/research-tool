@@ -655,6 +655,36 @@ describe('export au format classeur', () => {
   });
 });
 
+describe('assistant de rédaction', () => {
+  test('l’assistant se déclare indisponible sans clé API', async () => {
+    const { data } = await api<any>('GET', '/api/redaction/status');
+    assert.equal(data.available, false);
+  });
+
+  test('le flux livre son erreur au client au lieu de rester vide', async () => {
+    // L'en-tête part avant que l'erreur ne survienne : elle ne peut donc plus
+    // être un code HTTP, elle voyage dans le flux. Une écoute mal placée —
+    // « close » sur la requête plutôt que sur la réponse — ferait partir un
+    // flux vide avec un HTTP 200, sans le moindre message visible.
+    const res = await fetch(`${baseUrl}/api/redaction/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'Décris la population.' }] }),
+    });
+
+    assert.match(res.headers.get('content-type') ?? '', /text\/event-stream/);
+    const flux = await res.text();
+    assert.ok(flux.length > 0, 'le flux ne doit pas être vide');
+    assert.match(flux, /^event: error$/m);
+    assert.match(flux, /ANTHROPIC_API_KEY/);
+  });
+
+  test('une conversation vide est refusée', async () => {
+    const { status } = await api('POST', '/api/redaction/message', { messages: [] });
+    assert.equal(status, 400);
+  });
+});
+
 describe('robustesse de l’API', () => {
   test('un identifiant inexistant renvoie 404', async () => {
     const { status } = await api('GET', '/api/patients/999999');

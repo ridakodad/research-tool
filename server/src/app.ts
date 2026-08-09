@@ -10,6 +10,7 @@ import { templatesRouter } from './routes/templates.js';
 import { recordsRouter } from './routes/records.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { exportRouter } from './routes/export.js';
+import { redactionRouter } from './routes/redaction.js';
 
 /** Construit l'application Express. Séparé du démarrage pour les tests. */
 export function createApp(): Express {
@@ -30,6 +31,7 @@ export function createApp(): Express {
   app.use('/api/records', recordsRouter);
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/export', exportRouter);
+  app.use('/api', redactionRouter);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Route inconnue.' });

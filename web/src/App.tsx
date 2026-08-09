@@ -10,6 +10,7 @@ import {
   IconForm,
   IconGauge,
   IconSidebar,
+  IconWrite,
   IconTable,
   IconWorkspace,
 } from './components/icons';
@@ -18,6 +19,7 @@ import { DossiersPage } from './pages/DossiersPage';
 import { DossierDetailPage } from './pages/DossierDetailPage';
 import { FichePage } from './pages/FichePage';
 import { ExtractionPage } from './pages/ExtractionPage';
+import { RedactionPage } from './pages/RedactionPage';
 import { ResultatsPage } from './pages/ResultatsPage';
 import { WorkspacePage } from './pages/WorkspacePage';
 
@@ -69,6 +71,7 @@ function ToolRail({ collapsed }: { collapsed: boolean }) {
           matchPrefix: '/fiche',
         },
         { to: '/extraction', label: 'Extraction', icon: IconExtract, matchPrefix: '/extraction' },
+        { to: '/redaction', label: 'Rédaction', icon: IconWrite, matchPrefix: '/redaction' },
       ],
     },
     {
@@ -213,6 +216,7 @@ export function App() {
                 <Route path="/dossiers/:id" element={<DossierDetailPage />} />
                 <Route path="/fiche" element={<FichePage />} />
                 <Route path="/extraction" element={<ExtractionPage />} />
+                <Route path="/redaction" element={<RedactionPage />} />
                 <Route path="/resultats" element={<ResultatsPage />} />
                 <Route path="/index.html" element={<Navigate to="/" replace />} />
                 <Route

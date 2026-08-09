@@ -1176,3 +1176,69 @@ details.section[open] > summary::before { transform: rotate(90deg); }
   border-left-color: var(--warning);
   background: var(--surface-2);
 }
+
+/* ============================================================= rédaction ==== */
+
+/*
+ * Fil de conversation. Largeur de lecture bornée : on y lit des paragraphes
+ * d'article, pas des lignes de tableau, et une ligne trop longue fatigue.
+ */
+.chat-thread {
+  display: flex; flex-direction: column; gap: var(--s5);
+  max-width: 82ch;
+}
+
+.chat-turn { display: flex; flex-direction: column; gap: var(--s2); }
+.chat-role {
+  font-size: 0.7rem; font-weight: 650; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.chat-body {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+/* La demande se distingue de la réponse par un aplat, pas par une bulle :
+   on lit un document, pas une messagerie. */
+.chat-user .chat-role { color: var(--brand-strong); }
+.chat-user .chat-body {
+  background: var(--brand-soft);
+  border-left: 3px solid var(--brand);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: var(--s3) var(--s4);
+}
+
+/* Curseur de frappe : signale que la rédaction se poursuit. */
+.chat-caret {
+  display: inline-block;
+  width: 2px; height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--brand);
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink { to { visibility: hidden; } }
+
+.chat-start {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center;
+  padding: var(--s6) var(--s5);
+}
+.chat-start .tool-icon { width: 52px; height: 52px; margin-bottom: var(--s4); }
+.chat-start h2 { margin-bottom: var(--s2); }
+
+.chat-compose {
+  position: sticky;
+  bottom: var(--s4);
+  display: flex; flex-direction: column; gap: var(--s2);
+  padding: var(--s3);
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-heavy);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
+  box-shadow: var(--shadow-2);
+  max-width: 82ch;
+}
+.chat-compose textarea { border-color: transparent; background: transparent; resize: vertical; }
+.chat-compose textarea:focus { border-color: var(--brand); background: var(--surface-1); }

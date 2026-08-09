@@ -157,6 +157,65 @@ export const api = {
   }) =>
     post<ExtractionRunResult>('/records/extraction/run', body),
 
+  // --------------------------------------------------------------- rédaction
+  redactionStatus: () => get<{ available: boolean }>('/redaction/status'),
+
+  /**
+   * Échange avec l'assistant, lu au fil de sa production.
+   *
+   * Le serveur répond en « événements côté serveur ». `EventSource` ne sait pas
+   * émettre de POST : on lit donc le flux à la main, ce qui permet en prime de
+   * l'interrompre proprement.
+   */
+  redactionMessage: async (
+    messages: { role: 'user' | 'assistant'; content: string }[],
+    signal: AbortSignal,
+    handlers: {
+      onDelta: (text: string) => void;
+      onDone: (usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number }) => void;
+      onError: (message: string) => void;
+    },
+  ): Promise<void> => {
+    const res = await fetch('/api/redaction/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages }),
+      signal,
+    });
+
+    if (!res.ok || !res.body) {
+      throw new ApiError(res.status, `Assistant injoignable (erreur ${res.status}).`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Les événements sont séparés par une ligne vide ; un fragment peut
+      // arriver coupé en deux, on ne traite donc que les blocs complets.
+      let coupure = buffer.indexOf('\n\n');
+      while (coupure !== -1) {
+        const bloc = buffer.slice(0, coupure);
+        buffer = buffer.slice(coupure + 2);
+
+        const type = /^event: (.+)$/m.exec(bloc)?.[1];
+        const brut = /^data: (.*)$/m.exec(bloc)?.[1];
+        if (type && brut) {
+          const payload = JSON.parse(brut) as Record<string, never>;
+          if (type === 'delta') handlers.onDelta(String(payload.text ?? ''));
+          else if (type === 'done') handlers.onDone(payload.usage as never);
+          else if (type === 'error') handlers.onError(String(payload.message ?? 'Erreur inconnue.'));
+        }
+        coupure = buffer.indexOf('\n\n');
+      }
+    }
+  },
+
   // --------------------------------------------------------------- résultats
   dataset: (templateId?: number) =>
     get<{
